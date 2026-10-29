@@ -1,0 +1,8 @@
+llm_response_debug.json
+api_response_debug.json
+.env
+venv/
+raw_data/
+db.sqlite3
+__pycache__/
+*.py[cod]
