@@ -45,6 +45,37 @@ Open the interactive Swagger UI at:
 
 The health endpoint (`/api/nutrition/health`) reports the active inference backend and its connectivity status.
 
+### 4. Start the standalone web frontend
+In another terminal, run its independent static server:
+
+```powershell
+.\venv\Scripts\python.exe web_frontend\server.py
+```
+
+The frontend is served at **`http://127.0.0.1:5500/`**; the API and Swagger UI remain on port `8000`. Frontend page routes are defined separately in `web_frontend/urls.py`, and Django's URL configuration contains only API/admin routes.
+
+The frontend reads its API origin from `web_frontend/config.json` (or `API_BASE_URL` in the frontend server environment). The browser submits to the frontend server, which forwards the request to the API and renders the response using Jinja templates. This server-side proxy means the browser does not need direct cross-origin API access.
+
+The UI uses Jinja templates in `web_frontend/templates`, split into page templates and reusable components. The frontend server logs browser requests, forwarded API request details, API response status/body excerpts, and request timing to its terminal. Tailwind is compiled to static CSS with:
+
+```powershell
+cd web_frontend
+npm install
+npm run build:css
+```
+
+Node/npm is only required to build the CSS; the deployed frontend is Jinja-rendered HTML and static CSS, served independently from Django.
+
+Chat conversations are stored in a separate `chat_history.sqlite3` database, not the nutrient database. Apply its schema separately:
+
+```powershell
+.\venv\Scripts\python.exe manage.py migrate --database=chat_history
+```
+
+The chat-history database stores submitted text, modality metadata, model-generated transcription and meal-identification output, plus uploaded image/audio files under `media/chat_history/`. Nutrient values are not persisted; opening a prior chat resolves its saved model-generated ingredient estimates against the current nutrient reference database. The browser receives a random owner cookie; this is a local history partition, not account authentication.
+
+Chat rows are also available as read-only **Chat history → Chat conversations / Chat messages** sections in Django Admin (`/admin/`). Sign in with a staff account; these admin views read from the separate chat-history database.
+
 ---
 
 ## Production Database Ingestion (One-Off Step)
@@ -137,6 +168,8 @@ python manage.py test
 
 1. **Database Engine**:
    - Use **PostgreSQL 14+** in production instead of SQLite.
+   - Configure `CHAT_HISTORY_DB_ENGINE` and `CHAT_HISTORY_DB_*` independently from the nutrient database. Apply `python manage.py migrate --database=chat_history`.
+   - Use a Django storage backend backed by object storage for chat uploads in production; the default local storage is for development only.
    - Configure connection pooling (e.g., via `django-db-geventpool`, `pgbouncer`, or Gunicorn worker threads).
    - Because the IFCT dataset is static ground-truth reference data (~542 food entities), enable in-memory caching (Redis / Memcached) for frequent food lookups.
 2. **Environment Variables (`.env`)**:

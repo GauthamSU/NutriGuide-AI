@@ -1,0 +1,30 @@
+<main class="flex min-h-0 flex-1 flex-col" data-conversation-id="{{ conversation_id }}">
+  <section id="conversation" class="chat-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-10 sm:px-8" aria-live="polite">
+    <div class="mx-auto flex min-h-full max-w-[760px] flex-col py-8" id="conversation-content">
+      {% if history_error %}<p class="rounded-lg border border-[#f1d8d1] bg-[#fff9f7] p-4 text-sm text-[#9d4534]" role="alert">{{ history_error }}</p>{% endif %}
+      {% if conversation %}
+        {% for turn in conversation.messages %}
+          {% set turn_id = turn.id %}
+          {% set logged_to_tracker = turn.logged_to_tracker %}
+          {% set user_text = turn.user_query %}
+          {% set transcription = turn.transcription %}
+          {% set image_name = turn.image_name %}
+          {% set voice_name = turn.audio_name %}
+          {% set image_url = turn.image_url %}
+          {% set audio_url = turn.audio_url %}
+          {% set result = turn.result %}
+          {% set include_user = true %}
+          {% include "components/conversation_turn.html" %}
+        {% endfor %}
+      {% else %}
+        <div class="mb-6 text-center" id="welcome-message"><span class="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-[15px_15px_15px_4px] bg-[#245c43] text-xl font-bold text-[#d7ed9f]">N</span><h1 class="serif mb-2 text-[30px] leading-tight sm:text-[36px]">What's on your plate?</h1><p class="mx-auto max-w-md text-sm leading-relaxed text-[#6d7871]">Describe your meal, add a photo, or tell me about it. I’ll estimate nutrition using IFCT reference data. Say <strong>"log this to my tracker"</strong> or click <strong>Log to Tracker</strong> on any dish to record it.</p></div>
+      {% endif %}
+    </div>
+  </section>
+  <div class="composer-shell w-full flex-none px-3 pb-3 pt-4 sm:px-6 sm:pb-5">
+    <div class="mx-auto max-w-[760px]">
+      {% include "components/meal_input.html" %}
+      <p class="mt-2 text-center text-[10px] text-[#89938c]">Nutrition estimates are based on identified ingredients and portions. Meals are only added to your Tracker when you explicitly ask or click "Log to Tracker".</p>
+    </div>
+  </div>
+</main>

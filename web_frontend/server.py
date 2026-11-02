@@ -1,0 +1,1125 @@
+import base64
+import json
+import logging
+import mimetypes
+import os
+import time
+import uuid
+from email import policy
+from email.parser import BytesParser
+from http.cookies import CookieError, SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+import httpx
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+try:
+    from web_frontend.urls import FRAGMENT_ROUTES, PAGE_ROUTES
+except ImportError:
+    from urls import FRAGMENT_ROUTES, PAGE_ROUTES
+
+
+FRONTEND_ROOT = Path(__file__).resolve().parent
+logger = logging.getLogger("nutriguide.frontend")
+logging.basicConfig(
+    level=os.getenv("FRONTEND_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+TEMPLATES = Environment(
+    loader=FileSystemLoader(FRONTEND_ROOT / "templates"),
+    autoescape=select_autoescape(("html", "xml")),
+)
+with (FRONTEND_ROOT / "config.json").open(encoding="utf-8") as config_file:
+    FRONTEND_CONFIG = json.load(config_file)
+API_BASE_URL = os.getenv(
+    "API_BASE_URL", FRONTEND_CONFIG.get("api_base_url", "http://127.0.0.1:8000")
+).rstrip("/")
+
+
+def _empty_tracker_summary() -> dict:
+    empty_macros = {
+        "calories_kcal": 0.0,
+        "protein_g": 0.0,
+        "carbohydrates_g": 0.0,
+        "dietary_fiber_g": 0.0,
+        "total_sugars_g": 0.0,
+        "added_sugars_g": 0.0,
+        "total_fat_g": 0.0,
+        "saturated_fat_g": 0.0,
+        "monounsaturated_fat_g": 0.0,
+        "polyunsaturated_fat_g": 0.0,
+        "unsaturated_fat_g": 0.0,
+        "trans_fat_g": 0.0,
+        "cholesterol_mg": 0.0,
+        "sodium_mg": 0.0,
+        "water_g": 0.0,
+    }
+    empty_period = {
+        "period": "daily",
+        "label": "Daily Tracker (Today)",
+        "period_label": "Daily Tracker (Today)",
+        "period_days": 1,
+        "meals_count": 0,
+        "active_days": 0,
+        "daily_average_calories_kcal": 0.0,
+        "macronutrients": dict(empty_macros),
+        "total_macronutrients": dict(empty_macros),
+        "daily_average_macronutrients": dict(empty_macros),
+        "macro_target_percents": {k: 0.0 for k in empty_macros},
+        "micronutrients": {"vitamins": [], "minerals": []},
+        "total_micronutrients": {"vitamins": [], "minerals": []},
+        "meals": [],
+    }
+    return {
+        "active_period": "daily",
+        **empty_period,
+        "periods": {
+            "daily": {**empty_period, "period": "daily", "label": "Daily Tracker (Today)", "period_label": "Daily Tracker (Today)", "period_days": 1},
+            "weekly": {**empty_period, "period": "weekly", "label": "Weekly Tracker (Last 7 Days)", "period_label": "Weekly Tracker (Last 7 Days)", "period_days": 7},
+            "monthly": {**empty_period, "period": "monthly", "label": "Monthly Tracker (Last 30 Days)", "period_label": "Monthly Tracker (Last 30 Days)", "period_days": 30},
+        },
+    }
+
+
+def build_page_context(current_path: str = "/", **extra) -> dict:
+    """Build a standalone page context dictionary for template rendering."""
+    context = {
+        "api_base_url": API_BASE_URL,
+        "owner_id": str(uuid.uuid4()),
+        "conversation_id": str(uuid.uuid4()),
+        "history": [],
+        "meal_plan_history": [],
+        "my_groups": [],
+        "public_groups": [],
+        "tracker_summary": _empty_tracker_summary(),
+        "current_path": current_path,
+        "current_user": None,
+        "auth_mode": "signup" if current_path == "/signup" else "login",
+    }
+    context.update(extra)
+    return context
+
+
+def render_template(template_name: str, context: dict | None = None) -> str:
+    """Render a Jinja2 template from the web_frontend templates directory."""
+    return TEMPLATES.get_template(template_name).render(**(context or {}))
+
+
+
+class FrontendHandler(BaseHTTPRequestHandler):
+    server_version = "NutriGuideFrontend/1.0"
+
+    def do_GET(self):
+        parsed_url = urlsplit(self.path)
+        route_path = parsed_url.path.rstrip("/") or "/"
+
+        if route_path == "/meal-plans/history":
+            owner_id = self._get_owner_id()
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/chat-history/meal-plans",
+                        params={"owner_id": owner_id},
+                    )
+                response.raise_for_status()
+                self._send_json(response.json())
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load meal plan history owner=%s", owner_id)
+                self._send_json(
+                    {"detail": "Meal plan history is temporarily unavailable."},
+                    status=502,
+                )
+            return
+
+        if route_path == "/groups/data":
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            query_params = parse_qs(parsed_url.query)
+            params = {"owner_id": owner_id}
+            if token:
+                params["token"] = token
+            if query_params.get("q"):
+                params["q"] = query_params["q"][-1]
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/groups",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load groups directory")
+                self._send_json(
+                    {"detail": "Groups directory is temporarily unavailable."},
+                    status=502,
+                )
+            return
+
+        if route_path == "/groups/notifications":
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            params = {"owner_id": owner_id}
+            if token:
+                params["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/groups/notifications",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load group notifications")
+                self._send_json(
+                    {"detail": "Could not load group notifications."},
+                    status=502,
+                )
+            return
+
+        if route_path == "/tracker/data":
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            query_params = parse_qs(parsed_url.query)
+            period = (query_params.get("period") or ["daily"])[-1]
+            params = {"owner_id": owner_id, "period": period}
+            if token:
+                params["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/tracker/summary",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load tracker summary")
+                self._send_json(
+                    {"detail": "Nutrient tracker is temporarily unavailable."},
+                    status=502,
+                )
+            return
+
+        if route_path.startswith("/groups/") and route_path.endswith("/data"):
+            group_id = route_path.removeprefix("/groups/").removesuffix("/data").strip("/")
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            params = {"owner_id": owner_id}
+            if token:
+                params["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/groups/{group_id}",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load group detail group_id=%s", group_id)
+                self._send_json(
+                    {"detail": "Could not load group details."},
+                    status=502,
+                )
+            return
+
+        template_name = PAGE_ROUTES.get(route_path)
+        if template_name:
+            owner_id = self._get_owner_id()
+            conversation_id = str(uuid.uuid4())
+            context = self._page_context(
+                owner_id,
+                conversation_id,
+                current_path=route_path,
+            )
+            if self.headers.get("HX-Request", "").lower() == "true":
+                fragment = FRAGMENT_ROUTES.get(route_path, "components/chat_view.html")
+                self._send_template(fragment, context)
+            else:
+                self._send_template(template_name, context)
+        elif route_path.startswith("/chats/"):
+            owner_id = self._get_owner_id()
+            conversation_id = route_path.removeprefix("/chats/")
+            context = self._page_context(owner_id, conversation_id)
+            effective_owner = context.get("owner_id") or owner_id
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    chat_params = {"owner_id": effective_owner}
+                    token = self._get_auth_token()
+                    if token:
+                        chat_params["token"] = token
+                    response = client.get(
+                        f"{API_BASE_URL}/api/chat-history/conversations/{conversation_id}",
+                        params=chat_params,
+                    )
+                response.raise_for_status()
+                conversation = response.json()
+                for message in conversation.get("messages", []):
+                    analysis = message["result"].get("analysis") or {}
+                    analysis["total_micronutrients"] = self._aggregate_micronutrients(
+                        analysis.get("items") or []
+                    )
+                    message["result"]["analysis"] = analysis
+                    if message.get("has_image"):
+                        message["image_url"] = (
+                            f"/chat-assets/{conversation_id}/{message['id']}/image"
+                        )
+                    if message.get("has_audio"):
+                        message["audio_url"] = (
+                            f"/chat-assets/{conversation_id}/{message['id']}/audio"
+                        )
+                context["conversation"] = conversation
+                context["conversation_id"] = conversation_id
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load chat history conversation=%s", conversation_id)
+                context["history_error"] = "Could not load this chat. Please try again."
+            template = (
+                "components/chat_view.html"
+                if self.headers.get("HX-Request", "").lower() == "true"
+                else "pages/analyze.html"
+            )
+            self._send_template(template, context)
+        elif route_path.startswith("/chat-assets/"):
+            self._send_chat_asset(route_path)
+        elif route_path.startswith("/api/profile/avatar/") or route_path.startswith("/profile-assets/"):
+            self._send_profile_avatar(route_path)
+        elif route_path.startswith("/media/"):
+            self._send_media_file(route_path)
+        elif route_path == "/analyze/loading":
+            self._send_template("components/loading_turn.html", {})
+        elif route_path in {"/favicon.ico", "/favicon.svg"}:
+            self._send_asset("/assets/medical-icon--nutrition.svg")
+        elif route_path.startswith("/assets/"):
+            self._send_asset(route_path)
+        elif route_path.startswith("/src/"):
+            self._send_asset(route_path)
+        else:
+            self._send_template("pages/error.html", {"message": "Page not found."}, status=404)
+
+    def do_POST(self):
+        route_path = urlsplit(self.path).path.rstrip("/") or "/"
+
+        # ─── Authentication Proxy Routes ──────────────────────────────────────
+        if route_path in {"/auth/signup", "/auth/login"}:
+            fields, _ = self._parse_form()
+            owner_id = self._get_owner_id()
+            fields.setdefault("owner_id", owner_id)
+            api_endpoint = (
+                f"{API_BASE_URL}/api/auth/signup"
+                if route_path == "/auth/signup"
+                else f"{API_BASE_URL}/api/auth/login"
+            )
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(api_endpoint, json=fields)
+                payload = response.json()
+                if response.is_success:
+                    if payload.get("token"):
+                        self.auth_cookie_value = payload["token"]
+                    user_owner_id = (payload.get("user") or {}).get("owner_id")
+                    if user_owner_id:
+                        self.owner_cookie_value = user_owner_id
+                self._send_json(payload, status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Authentication API request failed path=%s", route_path)
+                self._send_json(
+                    {"detail": "Authentication service is temporarily unavailable."},
+                    status=502,
+                )
+            return
+
+        if route_path == "/auth/logout":
+            self.clear_auth_cookie = True
+            self.owner_cookie_value = str(uuid.uuid4())
+            self._send_json({"status": "ok"})
+            return
+
+        # ─── Profile Update Proxy Route ───────────────────────────────────────
+        if route_path in {"/profile/update", "/profile/upload", "/api/profile/upload", "/api/profile"}:
+            fields, uploads = self._parse_form()
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            fields["owner_id"] = fields.get("owner_id") or owner_id
+            if token:
+                fields["token"] = token
+            avatar_upload = None
+            for field_name, filename, content_type, data in uploads:
+                if field_name in {"avatar", "profile_picture_file", "profile_picture"} and data:
+                    guessed_mime, _ = mimetypes.guess_type(filename or "")
+                    mime = content_type or guessed_mime or "image/png"
+                    avatar_upload = (filename or "avatar.png", data, mime)
+                    break
+            api_headers = {}
+            if token:
+                api_headers["Authorization"] = f"Bearer {token}"
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    if avatar_upload is not None:
+                        form_data = {k: str(v) for k, v in fields.items() if v is not None}
+                        response = client.post(
+                            f"{API_BASE_URL}/api/profile/upload",
+                            data=form_data,
+                            files=[("profile_picture_file", avatar_upload)],
+                            headers=api_headers,
+                        )
+                    else:
+                        if str(fields.get("remove_profile_picture") or "").lower() in {"1", "true", "yes"}:
+                            fields["profile_picture"] = ""
+                        response = client.post(
+                            f"{API_BASE_URL}/api/profile",
+                            json=fields,
+                            headers=api_headers,
+                        )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Profile update failed")
+                self._send_json({"detail": "Could not update profile."}, status=502)
+            return
+
+        # ─── Tracker Proxy Routes ─────────────────────────────────────────────
+        if route_path == "/tracker/log":
+            fields, _ = self._parse_form()
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            fields["owner_id"] = fields.get("owner_id") or owner_id
+            if token:
+                fields["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(f"{API_BASE_URL}/api/tracker/log", json=fields)
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Tracker log request failed")
+                self._send_json({"detail": "Could not log meal to tracker."}, status=502)
+            return
+
+        if route_path.startswith("/tracker/meals/") and route_path.endswith("/delete"):
+            log_id = route_path.removeprefix("/tracker/meals/").removesuffix("/delete").strip("/")
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            params = {"owner_id": owner_id}
+            if token:
+                params["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/tracker/meals/{log_id}/delete",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Tracker meal delete failed")
+                self._send_json({"detail": "Could not remove meal from tracker."}, status=502)
+            return
+
+        # ─── Deletion Proxy Routes (Meal Plans, Conversations, Chat Messages) ─
+        if route_path.startswith("/meal-plans/") and route_path.endswith("/delete"):
+            meal_plan_id = route_path.removeprefix("/meal-plans/").removesuffix("/delete").strip("/")
+            owner_id = self._get_owner_id()
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/chat-history/meal-plans/{meal_plan_id}/delete",
+                        params={"owner_id": owner_id},
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not delete meal plan id=%s", meal_plan_id)
+                self._send_json({"detail": "Could not delete meal plan."}, status=502)
+            return
+
+        if route_path.startswith("/chats/") and route_path.endswith("/delete"):
+            inner = route_path.removeprefix("/chats/").removesuffix("/delete").strip("/")
+            parts = [p for p in inner.split("/") if p]
+            owner_id = self._get_owner_id()
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    if len(parts) == 3 and parts[1] == "messages":
+                        conv_id, _, msg_id = parts
+                        response = client.post(
+                            f"{API_BASE_URL}/api/chat-history/conversations/{conv_id}/messages/{msg_id}/delete",
+                            params={"owner_id": owner_id},
+                        )
+                    elif len(parts) == 1:
+                        conv_id = parts[0]
+                        response = client.post(
+                            f"{API_BASE_URL}/api/chat-history/conversations/{conv_id}/delete",
+                            params={"owner_id": owner_id},
+                        )
+                    else:
+                        self._send_json({"detail": "Invalid delete route."}, status=400)
+                        return
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Chat deletion failed path=%s", route_path)
+                self._send_json({"detail": "Could not delete chat item."}, status=502)
+            return
+
+        # ─── Groups Proxy Routes ──────────────────────────────────────────────
+        if route_path == "/groups/create":
+            fields, _ = self._parse_form()
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            fields["owner_id"] = fields.get("owner_id") or owner_id
+            if token:
+                fields["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(f"{API_BASE_URL}/api/groups", json=fields)
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group creation failed")
+                self._send_json({"detail": "Could not create group."}, status=502)
+            return
+
+        if route_path.startswith("/groups/") and route_path.endswith("/members"):
+            group_id = route_path.removeprefix("/groups/").removesuffix("/members").strip("/")
+            fields, _ = self._parse_form()
+            fields["owner_id"] = self._get_owner_id()
+            token = self._get_auth_token()
+            if token:
+                fields["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/groups/{group_id}/members",
+                        json=fields,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group member add failed")
+                self._send_json({"detail": "Could not add member to group."}, status=502)
+            return
+
+        if route_path.startswith("/groups/") and route_path.endswith("/join"):
+            group_id = route_path.removeprefix("/groups/").removesuffix("/join").strip("/")
+            params = {"owner_id": self._get_owner_id()}
+            token = self._get_auth_token()
+            if token:
+                params["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/groups/{group_id}/join",
+                        params=params,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group join failed")
+                self._send_json({"detail": "Could not join group."}, status=502)
+            return
+
+        if route_path.startswith("/groups/") and route_path.endswith("/meals"):
+            group_id = route_path.removeprefix("/groups/").removesuffix("/meals").strip("/")
+            fields, _ = self._parse_form()
+            fields["owner_id"] = self._get_owner_id()
+            token = self._get_auth_token()
+            if token:
+                fields["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/groups/{group_id}/meals",
+                        json=fields,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group meal log failed")
+                self._send_json({"detail": "Could not log meal to group."}, status=502)
+            return
+
+        if route_path.startswith("/groups/requests/") and route_path.endswith("/respond"):
+            request_id = (
+                route_path.removeprefix("/groups/requests/")
+                .removesuffix("/respond")
+                .strip("/")
+            )
+            fields, _ = self._parse_form()
+            fields["owner_id"] = self._get_owner_id()
+            token = self._get_auth_token()
+            if token:
+                fields["token"] = token
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/groups/requests/{request_id}/respond",
+                        json=fields,
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group request response failed request_id=%s", request_id)
+                self._send_json(
+                    {"detail": "Could not respond to group request."},
+                    status=502,
+                )
+            return
+
+        # ─── Meal Plan Generation (JSON or Multimodal Form) ───────────────────
+        if route_path == "/meal-plans/generate":
+            fields, uploads = self._parse_form()
+            owner_id = self._get_owner_id(create=True)
+            submitted_owner_id = fields.get("owner_id") or owner_id
+            if not fields and not uploads:
+                self._send_json({"detail": "A valid meal plan request is required."}, status=400)
+                return
+
+            prefs = fields.get("preferences", [])
+            if isinstance(prefs, str):
+                try:
+                    prefs = json.loads(prefs)
+                except ValueError:
+                    prefs = [p.strip() for p in prefs.split(",") if p.strip()]
+
+            json_payload = {
+                "owner_id": submitted_owner_id,
+                "preferences": prefs if isinstance(prefs, list) else [],
+                "custom_request": str(fields.get("custom_request") or ""),
+                "duration": str(fields.get("duration") or "daily"),
+                "diet_type": str(fields.get("diet_type") or ""),
+            }
+            if fields.get("image_base64"):
+                json_payload["image_base64"] = fields["image_base64"]
+                json_payload["image_mime_type"] = fields.get("image_mime_type") or "image/jpeg"
+            if fields.get("audio_base64"):
+                json_payload["audio_base64"] = fields["audio_base64"]
+                json_payload["audio_format"] = fields.get("audio_format") or "wav"
+
+            for field_name, filename, content_type, data in uploads:
+                if not data:
+                    continue
+                if field_name == "image":
+                    json_payload["image_base64"] = base64.b64encode(data).decode("utf-8")
+                    guessed_mime, _ = mimetypes.guess_type(filename or "")
+                    json_payload["image_mime_type"] = content_type or guessed_mime or "image/jpeg"
+                    json_payload["image_name"] = filename
+                elif field_name == "voice":
+                    json_payload["audio_base64"] = base64.b64encode(data).decode("utf-8")
+                    ext = Path(filename or "audio.wav").suffix.lower().lstrip(".")
+                    json_payload["audio_format"] = ext if ext in {"wav", "mp3"} else "wav"
+                    json_payload["audio_name"] = filename
+
+            try:
+                with httpx.Client(timeout=600.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/nutrition/meal-plans/generate",
+                        json=json_payload,
+                    )
+                try:
+                    payload = response.json()
+                except ValueError:
+                    payload = {"detail": response.text or "The API returned an empty response."}
+                self._send_json(payload, status=response.status_code)
+            except httpx.HTTPError:
+                logger.exception("Meal plan API request failed")
+                self._send_json(
+                    {"detail": "Could not reach the meal planning API. Please try again."},
+                    status=502,
+                )
+            return
+
+        if route_path not in {"/analyze", "/analyze/fragment", "/api/analyze"}:
+            self._send_template("pages/error.html", {"message": "Page not found."}, status=404)
+            return
+
+        started = time.perf_counter()
+        fields, uploads = self._parse_form()
+        meal_text = fields.get("text", "").strip()
+        submitted_owner_id = fields.get("owner_id")
+        if submitted_owner_id and submitted_owner_id != self._get_owner_id(create=False):
+            self._send_turn_fragment(
+                user_text=meal_text,
+                error="Your chat session expired. Reload the page before sending another message.",
+            )
+            return
+        file_summary = [
+            {"field": field, "filename": name, "content_type": content_type, "bytes": len(data)}
+            for field, name, content_type, data in uploads
+        ]
+        logger.info(
+            "Browser request method=%s path=%s client=%s text=%r uploads=%s",
+            self.command,
+            route_path,
+            self.client_address[0],
+            meal_text[:500],
+            file_summary,
+        )
+
+        if not meal_text and not uploads:
+            self._send_turn_fragment(
+                user_text=meal_text,
+                error="Add a meal description, photo, or voice note to continue.",
+            )
+            return
+
+        if uploads:
+            endpoint = f"{API_BASE_URL}/api/nutrition/analyze"
+            data = {key: value for key, value in fields.items() if key != "text" or value}
+            if meal_text:
+                data["text"] = meal_text
+            for key in ("owner_id", "conversation_id", "user_id"):
+                if fields.get(key):
+                    data[key] = fields[key]
+            files = [
+                (field, (name, content, content_type))
+                for field, name, content_type, content in uploads
+            ]
+            request_description = {"form_fields": data, "uploads": file_summary}
+        else:
+            endpoint = f"{API_BASE_URL}/api/nutrition/analyze/text"
+            data = {"text": meal_text}
+            for key in ("user_id", "owner_id", "conversation_id"):
+                if fields.get(key):
+                    data[key] = fields[key]
+            files = None
+            request_description = data
+
+        logger.info("Forwarding API request method=POST url=%s payload=%s", endpoint, request_description)
+        try:
+            with httpx.Client(timeout=360.0) as client:
+                if files:
+                    api_response = client.post(endpoint, data=data, files=files)
+                else:
+                    api_response = client.post(endpoint, json=data)
+            duration_ms = round((time.perf_counter() - started) * 1000)
+            response_text = api_response.text
+            logger.info(
+                "API response status=%s duration_ms=%s content_type=%s body_excerpt=%r",
+                api_response.status_code,
+                duration_ms,
+                api_response.headers.get("content-type", ""),
+                response_text[:2000],
+            )
+            try:
+                api_payload = api_response.json()
+            except ValueError:
+                api_payload = {"detail": response_text[:2000] or "The API returned an empty response."}
+
+            if api_response.is_success:
+                analysis = api_payload.get("analysis") or {}
+                api_payload["analysis"] = analysis
+                analysis["total_micronutrients"] = self._aggregate_micronutrients(
+                    analysis.get("items") or []
+                )
+                self._send_turn_fragment(
+                    user_text=meal_text,
+                    image_name=next((name for field, name, *_ in uploads if field == "image"), None),
+                    voice_name=next((name for field, name, *_ in uploads if field == "voice"), None),
+                    result=api_payload,
+                    history_owner_id=fields.get("owner_id"),
+                    selected_chat_id=fields.get("conversation_id"),
+                )
+            else:
+                messages = api_payload.get("errors") or [api_payload.get("detail", "Analysis failed.")]
+                error = " ".join(str(message) for message in messages)
+                self._send_turn_fragment(
+                    user_text=meal_text,
+                    image_name=next((name for field, name, *_ in uploads if field == "image"), None),
+                    voice_name=next((name for field, name, *_ in uploads if field == "voice"), None),
+                    error=error,
+                )
+        except httpx.HTTPError:
+            logger.exception("API request failed url=%s", endpoint)
+            self._send_turn_fragment(
+                user_text=meal_text,
+                error=f"Could not reach the nutrition API at {API_BASE_URL}.",
+            )
+
+    def log_message(self, format_string, *args):
+        logger.info("HTTP %s - %s", self.client_address[0], format_string % args)
+
+    def _parse_form(self):
+        content_length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(content_length)
+        content_type = self.headers.get("Content-Type", "")
+        if content_type.startswith("application/json"):
+            try:
+                parsed = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return {}, []
+            return (parsed, []) if isinstance(parsed, dict) else ({}, [])
+        if content_type.startswith("application/x-www-form-urlencoded"):
+            parsed = parse_qs(body.decode("utf-8", errors="replace"), keep_blank_values=True)
+            return {key: values[-1] for key, values in parsed.items()}, []
+
+        message = BytesParser(policy=policy.default).parsebytes(
+            f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode() + body
+        )
+        fields = {}
+        uploads = []
+        if not message.is_multipart():
+            return fields, uploads
+        for part in message.iter_parts():
+            field_name = part.get_param("name", header="content-disposition")
+            if not field_name:
+                continue
+            content = part.get_payload(decode=True) or b""
+            filename = part.get_filename()
+            if filename:
+                uploads.append((field_name, Path(filename).name, part.get_content_type(), content))
+            else:
+                charset = part.get_content_charset() or "utf-8"
+                fields[field_name] = content.decode(charset, errors="replace")
+        return fields, uploads
+
+    def _get_cookies(self) -> SimpleCookie:
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except CookieError:
+            logger.warning("Ignoring malformed cookie header")
+        return cookie
+
+    def _get_auth_token(self):
+        cookie = self._get_cookies()
+        token_morsel = cookie.get("nutriguide_token")
+        return token_morsel.value if token_morsel and token_morsel.value else None
+
+    def _get_owner_id(self, create=True):
+        cookie = self._get_cookies()
+        owner_cookie = cookie.get("nutriguide_owner")
+        if owner_cookie:
+            try:
+                return str(uuid.UUID(owner_cookie.value))
+            except ValueError:
+                logger.warning("Ignoring invalid chat owner cookie")
+
+        if not create:
+            return None
+        owner_id = str(uuid.uuid4())
+        self.owner_cookie_value = owner_id
+        return owner_id
+
+    def _page_context(self, owner_id, conversation_id, **context):
+        health = None
+        health_url = f"{API_BASE_URL}/api/nutrition/health"
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(health_url)
+            if response.is_success:
+                health = response.json()
+        except (httpx.HTTPError, ValueError):
+            logger.exception("API health request failed url=%s", health_url)
+
+        current_user = None
+        token = self._get_auth_token()
+        if token or owner_id:
+            try:
+                params = {}
+                if token:
+                    params["token"] = token
+                if owner_id:
+                    params["owner_id"] = owner_id
+                with httpx.Client(timeout=5.0) as client:
+                    me_resp = client.get(f"{API_BASE_URL}/api/auth/me", params=params)
+                if me_resp.is_success:
+                    user_data = (me_resp.json() or {}).get("user")
+                    if user_data and not str(user_data.get("username", "")).startswith("guest_"):
+                        current_user = user_data
+                        if user_data.get("owner_id") and user_data["owner_id"] != owner_id:
+                            owner_id = user_data["owner_id"]
+                            self.owner_cookie_value = owner_id
+            except (httpx.HTTPError, ValueError):
+                pass
+
+        history_url = f"{API_BASE_URL}/api/chat-history/conversations"
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(history_url, params={"owner_id": owner_id})
+            response.raise_for_status()
+            chat_conversations = response.json()
+        except (httpx.HTTPError, ValueError):
+            logger.exception("Chat history request failed url=%s", history_url)
+            chat_conversations = []
+            context.setdefault("history_error", "Chat history is temporarily unavailable.")
+
+        my_groups = []
+        public_groups = []
+        pending_invitations = []
+        admin_pending_requests = []
+        my_pending_join_requests = []
+        notifications_count = 0
+        if context.get("current_path") == "/groups":
+            try:
+                g_params = {"owner_id": owner_id}
+                if token:
+                    g_params["token"] = token
+                with httpx.Client(timeout=10.0) as client:
+                    g_resp = client.get(f"{API_BASE_URL}/api/groups", params=g_params)
+                if g_resp.is_success:
+                    g_data = g_resp.json() or {}
+                    my_groups = g_data.get("my_groups") or []
+                    public_groups = g_data.get("public_groups") or []
+                    pending_invitations = g_data.get("pending_invitations") or []
+                    admin_pending_requests = g_data.get("admin_pending_requests") or []
+                    my_pending_join_requests = g_data.get("my_pending_join_requests") or []
+                    notifications_count = g_data.get("notifications_count") or 0
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Groups prefetch failed")
+
+        tracker_summary = _empty_tracker_summary()
+        if context.get("current_path") == "/tracker":
+            try:
+                t_params = {"owner_id": owner_id, "period": "daily"}
+                if token:
+                    t_params["token"] = token
+                with httpx.Client(timeout=10.0) as client:
+                    t_resp = client.get(f"{API_BASE_URL}/api/tracker/summary", params=t_params)
+                if t_resp.is_success:
+                    tracker_summary = t_resp.json() or tracker_summary
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Tracker prefetch failed")
+
+        return {
+            "api_base_url": API_BASE_URL,
+            "health": health,
+            "current_user": current_user,
+            "owner_id": owner_id,
+            "conversation_id": conversation_id,
+            "chat_conversations": chat_conversations,
+            "selected_chat_id": conversation_id,
+            "my_groups": my_groups,
+            "public_groups": public_groups,
+            "pending_invitations": pending_invitations,
+            "admin_pending_requests": admin_pending_requests,
+            "my_pending_join_requests": my_pending_join_requests,
+            "notifications_count": notifications_count,
+            "tracker_summary": tracker_summary,
+            **context,
+        }
+
+    def _send_turn_fragment(self, **context):
+        context.setdefault(
+            "include_user",
+            self.headers.get("HX-Request", "").lower() != "true",
+        )
+        owner_id = context.pop("history_owner_id", None)
+        selected_chat_id = context.pop("selected_chat_id", None)
+        result_obj = context.get("result") or {}
+        if isinstance(result_obj, dict):
+            context.setdefault("turn_id", result_obj.get("message_id"))
+            context.setdefault("logged_to_tracker", bool(result_obj.get("logged_to_tracker")))
+        if selected_chat_id:
+            context.setdefault("conversation_id", selected_chat_id)
+        context["history_oob"] = False
+        if owner_id:
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    response = client.get(
+                        f"{API_BASE_URL}/api/chat-history/conversations",
+                        params={"owner_id": owner_id},
+                    )
+                response.raise_for_status()
+                context["chat_conversations"] = response.json()
+                context["selected_chat_id"] = selected_chat_id
+                context["history_oob"] = True
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not refresh chat history sidebar")
+        turn_html = TEMPLATES.get_template("components/conversation_turn.html").render(**context)
+        self._send_html(turn_html)
+
+    def _send_chat_asset(self, route_path):
+        parts = route_path.strip("/").split("/")
+        if len(parts) != 4:
+            self.send_error(404)
+            return
+        owner_id = self._get_owner_id()
+        _, conversation_id, message_id, kind = parts
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(
+                    f"{API_BASE_URL}/api/chat-history/conversations/"
+                    f"{conversation_id}/messages/{message_id}/{kind}",
+                    params={"owner_id": owner_id},
+                )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            logger.exception("Could not retrieve chat attachment")
+            self.send_error(404)
+            return
+        body = response.content
+        self.send_response(response.status_code)
+        self.send_header(
+            "Content-Type",
+            response.headers.get("content-type", "application/octet-stream"),
+        )
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_profile_avatar(self, route_path):
+        owner_id = route_path.rstrip("/").split("/")[-1]
+        if not owner_id:
+            self.send_error(404)
+            return
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(f"{API_BASE_URL}/api/profile/avatar/{owner_id}")
+            response.raise_for_status()
+        except httpx.HTTPError:
+            logger.exception("Could not retrieve profile avatar owner_id=%s", owner_id)
+            self.send_error(404)
+            return
+        body = response.content
+        self.send_response(response.status_code)
+        self.send_header(
+            "Content-Type",
+            response.headers.get("content-type", "image/png"),
+        )
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self._safe_write(body)
+
+    def _send_media_file(self, route_path):
+        rel_path = route_path.removeprefix("/media/").lstrip("/")
+        media_root = Path(os.getenv("CORE_APP_MEDIA_ROOT", str(FRONTEND_ROOT.parent / "media")))
+        file_path = (media_root / rel_path).resolve()
+        if not str(file_path).startswith(str(media_root.resolve())) or not file_path.is_file():
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    resp = client.get(f"{API_BASE_URL}{route_path}")
+                if resp.is_success:
+                    self.send_response(resp.status_code)
+                    self.send_header("Content-Type", resp.headers.get("content-type", "application/octet-stream"))
+                    self.send_header("Content-Length", str(len(resp.content)))
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.end_headers()
+                    self._safe_write(resp.content)
+                    return
+            except Exception:
+                pass
+            self.send_error(404)
+            return
+
+        guessed_mime, _ = mimetypes.guess_type(file_path.name)
+        content_type = guessed_mime or "application/octet-stream"
+        body = file_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self._safe_write(body)
+
+    @staticmethod
+    def _aggregate_micronutrients(items):
+        totals = {"vitamins": {}, "minerals": {}}
+        for item in items:
+            micronutrients = item.get("micronutrients") or {}
+            for category in totals:
+                for nutrient in micronutrients.get(category) or []:
+                    name = str(nutrient.get("name", "Unknown"))
+                    unit = str(nutrient.get("unit", ""))
+                    key = (name, unit)
+                    aggregate = totals[category].setdefault(
+                        key,
+                        {"name": name, "unit": unit, "amount": 0.0, "daily_value_percent": 0.0},
+                    )
+                    aggregate["amount"] += float(nutrient.get("amount") or 0.0)
+                    aggregate["daily_value_percent"] += float(nutrient.get("daily_value_percent") or 0.0)
+        return {
+            category: [
+                {**nutrient, "amount": round(nutrient["amount"], 2), "daily_value_percent": round(nutrient["daily_value_percent"], 1)}
+                for nutrient in category_totals.values()
+            ]
+            for category, category_totals in totals.items()
+        }
+
+    def _write_cookies(self):
+        secure_suffix = "; Secure" if self.headers.get("X-Forwarded-Proto", "").lower() == "https" else ""
+        if getattr(self, "owner_cookie_value", None):
+            cookie = (
+                f"nutriguide_owner={self.owner_cookie_value}; Path=/; "
+                f"Max-Age=31536000; HttpOnly; SameSite=Lax{secure_suffix}"
+            )
+            self.send_header("Set-Cookie", cookie)
+        if getattr(self, "auth_cookie_value", None):
+            auth_cookie = (
+                f"nutriguide_token={self.auth_cookie_value}; Path=/; "
+                f"Max-Age=2592000; HttpOnly; SameSite=Lax{secure_suffix}"
+            )
+            self.send_header("Set-Cookie", auth_cookie)
+        if getattr(self, "clear_auth_cookie", False):
+            clear_cookie = f"nutriguide_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure_suffix}"
+            self.send_header("Set-Cookie", clear_cookie)
+
+    def _safe_write(self, body: bytes):
+        try:
+            self.wfile.write(body)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            logger.debug("Client closed connection before response completed")
+
+    def _send_template(self, template_name, context, status=200):
+        body = TEMPLATES.get_template(template_name).render(**context).encode("utf-8")
+        self._send_html(body.decode("utf-8"), status=status)
+
+    def _send_html(self, html, status=200):
+        body = html.encode("utf-8")
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self._write_cookies()
+            self.end_headers()
+            self._safe_write(body)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _send_json(self, payload, status=200):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self._write_cookies()
+            self.end_headers()
+            self._safe_write(body)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _send_asset(self, route_path):
+        asset_path = (FRONTEND_ROOT / route_path.lstrip("/")).resolve()
+        if FRONTEND_ROOT not in asset_path.parents or not asset_path.is_file():
+            self.send_error(404)
+            return
+        content_types = {
+            ".css": "text/css; charset=utf-8",
+            ".py": "text/plain; charset=utf-8",
+            ".svg": "image/svg+xml",
+            ".png": "image/png",
+            ".ico": "image/x-icon",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+        }
+        content_type = content_types.get(asset_path.suffix, "application/octet-stream")
+        body = asset_path.read_bytes()
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self._safe_write(body)
+        except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
+            pass
+
+
+def main():
+    host = os.getenv("FRONTEND_HOST", "127.0.0.1")
+    port = int(os.getenv("FRONTEND_PORT", "5500"))
+    server = ThreadingHTTPServer((host, port), FrontendHandler)
+    logger.info("Frontend listening at http://%s:%s/; API origin=%s", host, port, API_BASE_URL)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Stopping frontend server")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

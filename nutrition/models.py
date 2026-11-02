@@ -380,3 +380,23 @@ class BioactiveNutrient(models.Model):
 
     def __str__(self):
         return f"Bioactives for {self.food_id}"
+
+
+def __getattr__(name: str):
+    """
+    Re-export core application models from chat_history.models for backward compatibility
+    while keeping the nutrition app strictly limited to read-only IFCT 2017 reference tables.
+    """
+    if name in {
+        "UserProfile",
+        "NutritionGroup",
+        "GroupMembership",
+        "GroupMealLog",
+        "TrackedMeal",
+    }:
+        from chat_history import models as core_models
+
+        return getattr(core_models, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+

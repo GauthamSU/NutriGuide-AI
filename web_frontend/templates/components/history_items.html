@@ -1,0 +1,11 @@
+<div id="chat-history-list" class="chat-history-list" {% if history_oob %}hx-swap-oob="innerHTML"{% endif %}>
+  {% for chat in chat_conversations or [] %}
+    <div class="chat-history-row group flex items-center gap-1" data-chat-history-row="{{ chat.id }}">
+      <a class="chat-history-link min-w-0 flex-1" href="/chats/{{ chat.id }}" hx-get="/chats/{{ chat.id }}" hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/chats/{{ chat.id }}" hx-indicator="#chat-loading" title="{{ chat.title }}" {% if selected_chat_id == chat.id %}aria-current="page"{% endif %}>{{ chat.title }}</a>
+      <button type="button" class="chat-delete-btn" data-delete-chat-id="{{ chat.id }}" title="Delete conversation" aria-label="Delete conversation {{ chat.title }}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  {% endfor %}
+  {% if history_error %}<p class="sidebar-error" role="status">{{ history_error }}</p>{% endif %}
+</div>

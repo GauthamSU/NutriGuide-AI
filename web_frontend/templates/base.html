@@ -1,0 +1,4502 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f1">
+  <meta name="description" content="Understand the nutrition in your meal, grounded in food composition data.">
+  <title>{% block title %}NutriGuide{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/medical-icon--nutrition.svg">
+  <link rel="alternate icon" href="/assets/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="https://pyscript.net/releases/2026.7.3/core.css">
+  <script type="module" src="https://pyscript.net/releases/2026.7.3/core.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b26;
+      --muted: #6d7871;
+      --line: #e3e7df;
+      --paper: #fff;
+      --canvas: #f5f6f1;
+      --green: #245c43;
+      --green-deep: #173c2c;
+      --green-soft: #e6efe7;
+      --lime: #d7ed9f;
+      --coral: #c65a42;
+      --blue: #426d83;
+      font-family: "DM Sans", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background-color: var(--canvas);
+      background-image: linear-gradient(rgba(36, 92, 67, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(36, 92, 67, .025) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    label:focus-within {
+      outline: 3px solid rgba(66, 109, 131, .35);
+      outline-offset: 2px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .serif {
+      font-family: "DM Serif Display", Georgia, serif;
+      font-weight: 400;
+    }
+
+    .topbar {
+      height: 72px;
+      flex: none;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .94);
+      backdrop-filter: blur(8px);
+    }
+
+    .topbar-user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 11px 5px 6px;
+      border: 1px solid #d8e2d7;
+      border-radius: 999px;
+      background: #f4f8f2;
+      color: #173c2c;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color .15s ease, background .15s ease;
+    }
+
+    .topbar-user-pill:hover {
+      border-color: #245c43;
+      background: #eaf2e8;
+    }
+
+    .topbar-avatar {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--green);
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 700;
+      overflow: hidden;
+      flex: none;
+    }
+
+    .topbar-username {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .topbar-btn-ghost {
+      padding: 6px 12px;
+      border: 1px solid #dce2da;
+      border-radius: 8px;
+      background: #fff;
+      color: #35433b;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .topbar-btn-ghost:hover {
+      border-color: #9bb39e;
+      background: #f4f8f2;
+      color: #173c2c;
+    }
+
+    .topbar-btn-primary {
+      padding: 6px 13px;
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      background: var(--green);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+
+    .topbar-btn-primary:hover {
+      background: var(--green-deep);
+    }
+
+    .app-shell {
+      display: flex;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .chat-sidebar {
+      width: 262px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+      background: rgba(250, 251, 248, .96);
+      transition: width .2s ease;
+    }
+
+    .chat-sidebar.is-collapsed {
+      width: 0;
+      border-right: 0;
+    }
+
+    .sidebar-new-chat {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 16px 14px 12px;
+      padding: 10px 12px;
+      border: 1px solid #dce2da;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 2px 6px rgba(32, 43, 38, .03);
+    }
+
+    .sidebar-new-chat:hover,
+    .chat-history-link:hover {
+      border-color: #bdcbbf;
+      background: #f4f8f2;
+    }
+
+    .sidebar-section-title {
+      padding: 10px 16px 6px;
+      color: #89938c;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .7px;
+      text-transform: uppercase;
+    }
+
+    .chat-history-list {
+      min-height: 0;
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 8px 14px;
+      scrollbar-color: #cdd7cd transparent;
+      scrollbar-width: thin;
+    }
+
+    .chat-history-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: 2px 0;
+      border-radius: 8px;
+    }
+
+    .chat-history-link {
+      flex: 1;
+      min-width: 0;
+      display: block;
+      overflow: hidden;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: #53645a;
+      font-size: 12px;
+      text-decoration: none;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-history-link[aria-current="page"] {
+      border-color: #dbe5d9;
+      background: #eaf0e7;
+      color: #173c2c;
+      font-weight: 600;
+    }
+
+    .chat-history-link.htmx-request,
+    .sidebar-new-chat.htmx-request {
+      opacity: .55;
+      cursor: progress;
+    }
+
+    .chat-delete-btn {
+      width: 26px;
+      height: 26px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: transparent;
+      color: #89938c;
+      cursor: pointer;
+      opacity: .7;
+      transition: all .15s ease;
+    }
+
+    .chat-delete-btn:hover {
+      opacity: 1;
+      border-color: #f3d2c8;
+      background: #fdf0ec;
+      color: #b8422b;
+    }
+
+    .sidebar-error {
+      padding: 8px 10px;
+      color: #9d4534;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    #sidebar-toggle {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #53645a;
+      cursor: pointer;
+    }
+
+    #sidebar-toggle:hover {
+      background: #edf1eb;
+      color: var(--green);
+    }
+
+    .sidebar-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 2px 10px;
+      padding: 9px 12px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      color: #53645a;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all .15s ease;
+    }
+
+    .sidebar-nav-link:hover,
+    .sidebar-nav-link[aria-current="page"] {
+      border-color: #dbe5d9;
+      background: #eaf0e7;
+      color: #173c2c;
+    }
+
+    .sidebar-nav-icon {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      place-items: center;
+      color: #245c43;
+      flex: none;
+    }
+
+    #chat-view {
+      display: flex;
+      min-width: 0;
+      min-height: 0;
+      flex: 1;
+    }
+
+    /* Centered full-page dimmed & mildly blurred loader for all tabs */
+    .page-loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(23, 60, 44, 0.22);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .page-loading-overlay.htmx-request,
+    .htmx-request.page-loading-overlay,
+    .page-loading-overlay.is-active {
+      display: flex !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+
+    .page-loading-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 28px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(205, 224, 209, 0.95);
+      box-shadow: 0 24px 60px rgba(23, 60, 44, 0.24), 0 4px 16px rgba(0, 0, 0, 0.06);
+      animation: loadingCardPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: 90vw;
+    }
+
+    @keyframes loadingCardPop {
+      from { transform: scale(0.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .page-loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3.5px solid #d5e5d8;
+      border-top-color: #245c43;
+      border-radius: 50%;
+      animation: pageSpin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pageSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    .page-loading-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .page-loading-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #173c2c;
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: -0.2px;
+    }
+
+    .page-loading-sub {
+      margin: 0;
+      font-size: 11.5px;
+      color: #53645a;
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px 10px 10px 3px;
+      background: var(--green);
+      color: var(--lime);
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #a4aaa4;
+      box-shadow: 0 0 0 3px #edf0ea;
+    }
+
+    .health[data-state="online"] .health-dot {
+      background: #4a9b69;
+      box-shadow: 0 0 0 3px #e3f2e7;
+    }
+
+    .health[data-state="offline"] .health-dot {
+      background: var(--coral);
+      box-shadow: 0 0 0 3px #f9ece7;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--paper);
+      box-shadow: 0 10px 30px rgba(32, 43, 38, .04);
+    }
+
+    .panel-padded {
+      padding: 24px 28px;
+    }
+
+    .page-scroll {
+      scrollbar-color: #cdd7cd transparent;
+      scrollbar-width: thin;
+      padding: 24px 28px;
+    }
+
+    .section-eyebrow {
+      margin: 0 0 6px;
+      color: #245c43;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+    }
+
+    /* Form Controls & Buttons */
+    .form-label {
+      display: block;
+      margin-bottom: 6px;
+      color: #202b26;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .form-hint {
+      display: block;
+      margin-top: 5px;
+      color: #748078;
+      font-size: 11px;
+    }
+
+    .form-input {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #d5ded4;
+      border-radius: 10px;
+      background: #fbfcf9;
+      color: #202b26;
+      font-size: 13.5px;
+      line-height: 1.5;
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+
+    .form-input:focus {
+      border-color: #245c43;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(36, 92, 67, .12);
+      outline: none;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .form-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .form-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .form-actions-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid #e3e7df;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border: 1px solid var(--green);
+      border-radius: 10px;
+      background: var(--green);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(36, 92, 67, .16);
+      transition: all .15s ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--green-deep);
+      border-color: var(--green-deep);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: .55;
+      cursor: wait;
+      transform: none;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 10px 16px;
+      border: 1px solid #d5ded4;
+      border-radius: 10px;
+      background: #fff;
+      color: #202b26;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: #9bb39e;
+      background: #f4f8f2;
+      color: #173c2c;
+    }
+
+    .link-btn {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: var(--green);
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-green {
+      background: #e6efe7;
+      color: #173c2c;
+      border: 1px solid #cbe0ce;
+    }
+
+    .badge-coral {
+      background: #fdf0ec;
+      color: #9d4534;
+      border: 1px solid #f3d2c8;
+    }
+
+    .badge-blue {
+      background: #ebf3f6;
+      color: #2c5266;
+      border: 1px solid #cde0e8;
+    }
+
+    .badge-amber {
+      background: #fef6e4;
+      color: #925816;
+      border: 1px solid #f5dfa8;
+    }
+
+    /* Modal Dialog Styles */
+    .app-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(23, 60, 44, .42);
+      backdrop-filter: blur(4px);
+      overflow-y: auto;
+    }
+
+    .app-modal-backdrop.hidden {
+      display: none;
+    }
+
+    .app-modal-dialog {
+      width: 100%;
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
+      padding: 24px 28px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 24px 60px rgba(23, 60, 44, .22);
+    }
+
+    /* Compact Modal Dialog (Occupying 30%-40% of center screen on desktop) */
+    .modal-dialog-compact {
+      width: min(92vw, clamp(360px, 35vw, 480px)) !important;
+      max-width: 480px !important;
+      margin: auto;
+      padding: 22px 24px !important;
+    }
+
+    .modal-dialog-compact .form-grid-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 10px !important;
+    }
+
+    .modal-dialog-compact .form-grid-2 {
+      grid-template-columns: minmax(0, 1fr) !important;
+      gap: 12px !important;
+    }
+
+    /* Centered Actions in Groups and Empty State Containers */
+    .justify-center {
+      justify-content: center !important;
+    }
+
+    .group-empty-state-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center !important;
+      gap: 10px;
+      margin-top: 14px;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* Chat Turn Action Buttons (Log to Tracker & Delete Message) */
+    .turn-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .turn-action-log {
+      border: 1px solid #bdd4c2;
+      background: #eef5ee;
+      color: #173c2c;
+    }
+
+    .turn-action-log:hover {
+      border-color: #245c43;
+      background: #245c43;
+      color: #fff;
+    }
+
+    .turn-action-logged {
+      border: 1px solid #cbe0ce;
+      background: #e6efe7;
+      color: #245c43;
+      cursor: default;
+    }
+
+    .turn-action-delete {
+      border: 1px solid #e6ece4;
+      background: #fff;
+      color: #6d7871;
+    }
+
+    .turn-action-delete:hover {
+      border-color: #f3d2c8;
+      background: #fdf0ec;
+      color: #b8422b;
+    }
+
+    /* Segmented Tabs (Auth, Group Lists & Tracker Periods) */
+    .segmented-tabs {
+      display: inline-flex;
+      padding: 4px;
+      border: 1px solid #dce2da;
+      border-radius: 12px;
+      background: #f2f5ef;
+      gap: 4px;
+    }
+
+    .segmented-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 16px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: #53645a;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .segmented-tab.is-active {
+      background: #fff;
+      color: #173c2c;
+      box-shadow: 0 2px 8px rgba(32, 43, 38, .08);
+    }
+
+    /* Auth & Profile Layouts */
+    .auth-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .feature-checklist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .feature-checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+    }
+
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: #e6efe7;
+      color: #245c43;
+    }
+
+    .feature-checklist strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13.5px;
+      color: #173c2c;
+    }
+
+    .feature-checklist p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #53645a;
+    }
+
+    .profile-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.85fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .profile-avatar-lg {
+      width: 52px;
+      height: 52px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 14px 14px 14px 4px;
+      background: var(--green);
+      color: var(--lime);
+      font-size: 22px;
+      font-weight: 700;
+      overflow: hidden;
+    }
+
+    .stat-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat-mini-card {
+      padding: 13px 15px;
+      border: 1px solid #e2e8df;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .stat-mini-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .7px;
+      text-transform: uppercase;
+      color: #748078;
+    }
+
+    .stat-mini-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #173c2c;
+    }
+
+    .allergy-quick-chip {
+      padding: 4px 10px;
+      border: 1px dashed #c4d1c5;
+      border-radius: 999px;
+      background: #f8faf6;
+      color: #35433b;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .allergy-quick-chip:hover {
+      border-style: solid;
+      border-color: #245c43;
+      background: #e6efe7;
+      color: #173c2c;
+    }
+
+    /* Groups Page Styles */
+    .groups-top-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .radio-tab-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .radio-tab-card {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px 14px;
+      border: 1.5px solid #dce2da;
+      border-radius: 12px;
+      background: #fbfcf9;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .radio-tab-card:hover {
+      border-color: #9bb39e;
+      background: #f4f8f2;
+    }
+
+    .radio-tab-card.is-selected {
+      border-color: #245c43;
+      background: #eaf2eb;
+      box-shadow: inset 0 0 0 1px #245c43;
+    }
+
+    .radio-tab-icon {
+      width: 34px;
+      height: 34px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: #fff;
+      color: #245c43;
+      border: 1px solid #d8e2d7;
+    }
+
+    .group-directory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 420px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .group-list-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+      border: 1px solid #dfe6dc;
+      border-radius: 12px;
+      background: #fff;
+      transition: all .15s ease;
+    }
+
+    .group-list-card:hover {
+      border-color: #9bb39e;
+      box-shadow: 0 4px 14px rgba(32, 43, 38, .05);
+    }
+
+    .group-list-card.is-active {
+      border-color: #245c43;
+      background: #f2f7f1;
+    }
+
+    .collective-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .collective-stat-card {
+      padding: 18px 20px;
+      border: 1px solid #dfe6dc;
+      border-radius: 14px;
+      background: #fbfcf9;
+    }
+
+    .collective-stat-primary {
+      border-color: #bdd4c2;
+      background: linear-gradient(135deg, #eaf3ec 0%, #f7fbf6 100%);
+    }
+
+    .collective-stat-label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: #53645a;
+    }
+
+    .collective-stat-value {
+      display: block;
+      margin: 6px 0 4px;
+      font-size: 28px;
+      line-height: 1.1;
+      color: #173c2c;
+    }
+
+    .collective-stat-value small {
+      font-family: "DM Sans", sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6d7871;
+    }
+
+    .collective-stat-sub {
+      display: block;
+      font-size: 11px;
+      color: #6d7871;
+    }
+
+    .groups-detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .member-row-card {
+      padding: 14px 16px;
+      border: 1px solid #e2e8df;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .member-progress-track {
+      height: 6px;
+      width: 100%;
+      border-radius: 999px;
+      background: #edf1eb;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .member-progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--green);
+    }
+
+    /* Meal Plan Enhanced Styles */
+    .meal-plan-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      align-items: start;
+      gap: 24px;
+    }
+
+    .form-step-legend {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 12px;
+      color: #173c2c;
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+
+    .step-badge {
+      width: 22px;
+      height: 22px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e6efe7;
+      color: #245c43;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid #c6dac9;
+    }
+
+    /* Duration Radio Tabs (Daily / Weekly / Monthly) */
+    .duration-radio-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .duration-radio-tab {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 16px;
+      border: 1.5px solid #dce2da;
+      border-radius: 13px;
+      background: #fbfcf9;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .duration-radio-tab:hover {
+      border-color: #9bb39e;
+      background: #f4f8f2;
+    }
+
+    .duration-radio-tab.is-selected {
+      border-color: #245c43;
+      background: #e8f1e9;
+      box-shadow: 0 4px 12px rgba(36, 92, 67, .08), inset 0 0 0 1px #245c43;
+    }
+
+    .duration-tab-icon {
+      width: 38px;
+      height: 38px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: #fff;
+      color: #245c43;
+      border: 1px solid #d5e0d5;
+    }
+
+    .duration-radio-tab.is-selected .duration-tab-icon {
+      background: #245c43;
+      color: #d7ed9f;
+      border-color: #245c43;
+    }
+
+    .duration-tab-text strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #173c2c;
+    }
+
+    .duration-tab-text small {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #6d7871;
+    }
+
+    /* Dietary Type Radio Cards (Veg / Non-Veg / Vegan / Egg) */
+    .diet-radio-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .diet-radio-card {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 13px 14px;
+      border: 1.5px solid #dce2da;
+      border-radius: 13px;
+      background: #fbfcf9;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .diet-radio-card:hover {
+      border-color: #9bb39e;
+      background: #f4f8f2;
+    }
+
+    .diet-radio-card.is-selected {
+      border-color: #245c43;
+      background: #eef5ee;
+      box-shadow: 0 4px 12px rgba(36, 92, 67, .08), inset 0 0 0 1px #245c43;
+    }
+
+    .diet-mark {
+      width: 26px;
+      height: 26px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .diet-mark-veg {
+      border: 2px solid #1f7a44;
+    }
+
+    .diet-mark-veg i {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #1f7a44;
+      display: block;
+    }
+
+    .diet-mark-nonveg {
+      border: 2px solid #b8422b;
+    }
+
+    .diet-mark-nonveg i {
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 11px solid #b8422b;
+      display: block;
+    }
+
+    .diet-mark-vegan {
+      border: 2px solid #245c43;
+      background: #e6efe7;
+      color: #245c43;
+    }
+
+    .diet-mark-egg {
+      border: 2px solid #c4841d;
+      background: #fef6e4;
+      color: #b47110;
+    }
+
+    .diet-card-body {
+      min-width: 0;
+    }
+
+    .diet-card-title {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #173c2c;
+    }
+
+    .diet-card-sub {
+      display: block;
+      margin-top: 2px;
+      font-size: 10.5px;
+      color: #6d7871;
+      line-height: 1.3;
+    }
+
+    /* Focus Preference Pills */
+    .meal-preference {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid #d5ded4;
+      border-radius: 999px;
+      background: #fbfcf9;
+      padding: 8px 15px;
+      color: #435349;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .meal-preference:hover {
+      border-color: #9bb39e;
+      background: #f2f7f0;
+    }
+
+    .pref-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #b8c4b9;
+      transition: all .15s ease;
+    }
+
+    .meal-preference[aria-pressed="true"] {
+      border-color: #245c43;
+      background: #e6efe7;
+      color: #173c2c;
+      box-shadow: inset 0 0 0 1px #245c43;
+    }
+
+    .meal-preference[aria-pressed="true"] .pref-dot {
+      background: #245c43;
+      box-shadow: 0 0 0 3px rgba(36, 92, 67, .18);
+    }
+
+    /* Multimodal Composer on Meal Plan Page */
+    .meal-plan-composer {
+      border: 1.5px solid #d5ded4;
+      border-radius: 14px;
+      background: #fbfcf9;
+      overflow: hidden;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .meal-plan-composer:focus-within {
+      border-color: #245c43;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(36, 92, 67, .1);
+    }
+
+    .meal-plan-textarea {
+      display: block;
+      width: 100%;
+      padding: 14px 16px;
+      border: 0;
+      background: transparent;
+      color: #202b26;
+      font-size: 13.5px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+    }
+
+    .meal-plan-textarea::placeholder {
+      color: #89938c;
+    }
+
+    .meal-plan-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 16px 10px;
+    }
+
+    .meal-plan-chips:empty {
+      display: none;
+    }
+
+    .meal-plan-composer-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border-top: 1px solid #e6ece4;
+      background: #f4f7f2;
+    }
+
+    .composer-tool-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid #d5ded4;
+      border-radius: 9px;
+      background: #fff;
+      color: #35433b;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .composer-tool-btn:hover {
+      border-color: #245c43;
+      background: #eaf2eb;
+      color: #173c2c;
+    }
+
+    .composer-tool-btn.recording {
+      border-color: #c65a42;
+      background: #fdf0ec;
+      color: #b8422b;
+    }
+
+    /* Properly Aligned Meal Plan Footer & Button */
+    .meal-plan-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #e3e7df;
+    }
+
+    .meal-plan-disclaimer {
+      margin: 0;
+      max-width: 540px;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #748078;
+    }
+
+    .btn-create-plan {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 12px 24px;
+      border: 1px solid var(--green);
+      border-radius: 11px;
+      background: var(--green);
+      color: #fff;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(36, 92, 67, .18);
+      transition: all .15s ease;
+    }
+
+    .btn-create-plan:hover {
+      background: var(--green-deep);
+      border-color: var(--green-deep);
+      transform: translateY(-1px);
+    }
+
+    .btn-create-plan:disabled {
+      opacity: .55;
+      cursor: wait;
+      transform: none;
+    }
+
+    /* Meal Plan Result Sections & Cards */
+    .meal-sections-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .meal-section-card {
+      padding: 24px 26px;
+      border: 1px solid #dfe6dc;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(32, 43, 38, .035);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .meal-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #e6ece4;
+    }
+
+    .meal-section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .meal-section-icon {
+      width: 44px;
+      height: 44px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+    }
+
+    .meal-icon-breakfast {
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .meal-icon-lunch {
+      background: #e6efe7;
+      color: #245c43;
+      border: 1px solid #c8decb;
+    }
+
+    .meal-icon-snacks {
+      background: #ecfccb;
+      color: #3f6212;
+      border: 1px solid #d9f99d;
+    }
+
+    .meal-icon-dinner {
+      background: #e0e7ff;
+      color: #3730a3;
+      border: 1px solid #c7d2fe;
+    }
+
+    .meal-section-subtitle {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #6d7871;
+    }
+
+    .meal-option-card {
+      padding: 16px 18px;
+      border: 1px solid #e4ebe2;
+      border-radius: 12px;
+      background: #fbfcf9;
+      transition: border-color .15s ease;
+    }
+
+    .meal-option-card:hover {
+      border-color: #bfd1c2;
+      background: #f7faf5;
+    }
+
+    .meal-option-badge {
+      display: inline-block;
+      margin-bottom: 6px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #e8f0e8;
+      color: #245c43;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+
+    .meal-option-title {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #173c2c;
+      line-height: 1.35;
+    }
+
+    .meal-option-details {
+      margin: 0 0 10px;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #4a5a50;
+    }
+
+    .meal-option-why {
+      margin: 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: #eef5ee;
+      border-left: 3px solid #245c43;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #245c43;
+    }
+
+    .meal-plan-history {
+      position: sticky;
+      top: 18px;
+      height: calc(100dvh - 130px);
+      min-height: 260px;
+      max-height: 640px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 20px 22px;
+    }
+
+    .meal-plan-history-list {
+      min-height: 0;
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-color: #cdd7cd transparent;
+      scrollbar-width: thin;
+    }
+
+    .meal-plan-history-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: 4px 0;
+    }
+
+    .meal-plan-history-item {
+      flex: 1;
+      min-width: 0;
+      display: block;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      text-align: left;
+      color: #53645a;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+
+    .meal-plan-history-item:hover,
+    .meal-plan-history-item[aria-current="true"] {
+      border-color: #cfe0d2;
+      background: #f2f7f0;
+      color: #173c2c;
+    }
+
+    /* Chat Analyzer Styles */
+    .upload {
+      min-height: 82px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px;
+      border: 1px dashed #cbd6cc;
+      border-radius: 8px;
+      background: #fbfcf9;
+      cursor: pointer;
+    }
+
+    .upload:hover {
+      border-color: var(--green);
+      background: #f6faf5;
+    }
+
+    .upload input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+
+    .upload-icon {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: var(--green);
+      background: var(--green-soft);
+      font-size: 17px;
+    }
+
+    .chat-scroll {
+      scrollbar-color: #cdd7cd transparent;
+      scrollbar-width: thin;
+    }
+
+    .composer-shell {
+      background: linear-gradient(180deg, rgba(245, 246, 241, 0), rgba(245, 246, 241, .96) 24%);
+    }
+
+    .htmx-indicator {
+      display: none;
+    }
+
+    .htmx-request.htmx-indicator {
+      display: block;
+    }
+
+    .htmx-indicator.page-loading-overlay {
+      display: none;
+    }
+
+    .htmx-request.htmx-indicator.page-loading-overlay,
+    .htmx-indicator.page-loading-overlay.htmx-request,
+    .htmx-indicator.page-loading-overlay.is-active {
+      display: flex !important;
+    }
+
+    .pending-dots i {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .pending-dots i:nth-child(2) {
+      animation-delay: 150ms;
+    }
+
+    .pending-dots i:nth-child(3) {
+      animation-delay: 300ms;
+    }
+
+    .composer-box {
+      box-shadow: 0 8px 32px rgba(32, 43, 38, .09);
+    }
+
+    .attachment-chip {
+      display: inline-flex;
+      max-width: min(100%, 300px);
+      min-width: 0;
+      align-items: center;
+      gap: 7px;
+      overflow: hidden;
+      border: 1px solid #e1e7df;
+      border-radius: 12px;
+      background: #f7f9f5;
+      padding: 4px 8px;
+      color: #53645a;
+      font-size: 11px;
+    }
+
+    .attachment-chip-label {
+      min-width: 0;
+      max-width: 210px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .attachment-thumbnail {
+      width: 42px;
+      height: 34px;
+      flex: none;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .attachment-remove {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      flex: none;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #738078;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .attachment-remove:hover {
+      background: #fff;
+      color: #b84936;
+    }
+
+    .submitted-image-preview {
+      display: block;
+      width: auto;
+      max-width: min(100%, 280px);
+      max-height: 190px;
+      margin-top: 8px;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .submitted-voice-label {
+      display: block;
+      margin-top: 8px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      font-size: 11px;
+      color: #53645a;
+    }
+
+    #send-button.sending {
+      opacity: .48;
+      cursor: wait;
+    }
+
+    .icon-button {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      flex: none;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #53645a;
+      cursor: pointer;
+    }
+
+    .icon-button:hover {
+      background: #edf1eb;
+      color: var(--green);
+    }
+
+    .icon-button.recording {
+      background: #f9ece7;
+      color: #b84936;
+    }
+
+    .recording-pulse {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .recording-wave {
+      height: 32px;
+    }
+
+    .recording-wave i {
+      display: block;
+      width: 3px;
+      height: 7px;
+      border-radius: 4px;
+      background: #c65a42;
+      animation: waveform .72s ease-in-out infinite alternate;
+    }
+
+    .recording-wave i:nth-child(2) {
+      animation-delay: .1s;
+    }
+
+    .recording-wave i:nth-child(3) {
+      animation-delay: .2s;
+    }
+
+    .recording-wave i:nth-child(4) {
+      animation-delay: .3s;
+    }
+
+    .recording-wave i:nth-child(5) {
+      animation-delay: .18s;
+    }
+
+    .recording-wave i:nth-child(6) {
+      animation-delay: .08s;
+    }
+
+    .recording-wave i:nth-child(7) {
+      animation-delay: .24s;
+    }
+
+    @keyframes waveform {
+      from {
+        height: 5px;
+      }
+
+      to {
+        height: 24px;
+      }
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: .35;
+      }
+    }
+
+    .user-turn {
+      display: block;
+      width: fit-content;
+      height: auto;
+      min-height: 0;
+      max-width: min(70%, 520px);
+      min-width: 0;
+      margin-left: auto;
+      border-radius: 16px 16px 4px 16px;
+      background: #e8eee6;
+      padding: 8px 12px;
+      color: #24342a;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .user-turn p {
+      white-space: pre-wrap;
+    }
+
+    .assistant-turn {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      margin: 26px 0 34px;
+      overflow-wrap: anywhere;
+    }
+
+    .ingredient-disclosure {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .ingredient-disclosure-clip {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .32s ease;
+    }
+
+    .ingredient-disclosure[open] .ingredient-disclosure-clip {
+      grid-template-rows: 1fr;
+    }
+
+    .ingredient-disclosure-content {
+      min-height: 0;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+
+    .ingredient-disclosure-content>* {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    .ingredient-disclosure summary {
+      cursor: pointer;
+    }
+
+    /* Tracker Period Banner, Hero Cards & Nutrient Columns */
+    .tracker-content-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      width: 100%;
+    }
+
+    .tracker-meals-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .tracker-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px;
+      border-radius: 16px;
+      border: 1px solid #cde0d1;
+      background: linear-gradient(135deg, #eaf3ec 0%, #f4f9f4 50%, #ffffff 100%);
+      box-shadow: 0 2px 10px rgba(23, 60, 44, .04);
+    }
+
+    .tracker-banner-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .tracker-banner-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tracker-hero-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .group-detail-header-actions {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    #add-group-member-form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin: 0;
+    }
+
+    #add-member-submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center !important;
+      margin: 0 auto !important;
+      text-align: center;
+    }
+
+    .tracker-nutrients-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .tracker-macro-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 2px;
+      border-bottom: 1px solid #edf2ec;
+      font-size: 12px;
+    }
+
+    .tracker-macro-row:last-child {
+      border-bottom: none;
+    }
+
+    .tracker-meal-card {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-radius: 14px;
+      border: 1px solid #dfe6dc;
+      background: #ffffff;
+      padding: 18px 22px;
+      box-shadow: 0 1px 4px rgba(23, 60, 44, .03);
+      transition: all .15s ease;
+    }
+
+    .tracker-meal-card:hover {
+      border-color: #a7c4ac;
+      box-shadow: 0 3px 12px rgba(23, 60, 44, .07);
+    }
+
+    .tracker-chat-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #c9decb;
+      background: #eef6f0;
+      color: #1a4d36;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all .15s ease;
+    }
+
+    .tracker-chat-link:hover {
+      background: #dfefe2;
+      border-color: #9abf9f;
+      color: #123826;
+      transform: translateY(-1px);
+    }
+
+    @keyframes turnHighlightPulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(74, 155, 105, .5);
+        border-color: #4a9b69;
+      }
+
+      50% {
+        box-shadow: 0 0 0 10px rgba(74, 155, 105, .2);
+        border-color: #245c43;
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(74, 155, 105, 0);
+      }
+    }
+
+    .turn-highlight-pulse {
+      animation: turnHighlightPulse 2s ease-in-out;
+      border-radius: 14px;
+    }
+
+    @media(max-width:1080px) {
+
+      .meal-plan-layout,
+      .auth-grid,
+      .profile-layout,
+      .groups-top-grid,
+      .groups-detail-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .collective-stats-grid,
+      .diet-radio-grid,
+      .tracker-hero-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .tracker-nutrients-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .meal-plan-history {
+        position: static;
+        height: auto;
+        max-height: 360px;
+      }
+    }
+
+    @media(max-width:720px) {
+      .tracker-nutrients-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .tracker-hero-grid,
+      .collective-stats-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .group-detail-header-actions {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .tracker-banner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .tracker-banner-right {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .meal-sections-grid,
+      .duration-radio-tabs,
+      .form-grid-2,
+      .form-grid-3,
+      .form-grid-4,
+      .radio-tab-group {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .panel-padded,
+      .page-scroll,
+      .app-modal-dialog {
+        padding: 18px 16px;
+      }
+
+      .topbar {
+        height: 62px;
+        flex: none;
+      }
+
+      .topbar-model {
+        display: none;
+      }
+
+      .chat-sidebar {
+        position: fixed;
+        z-index: 20;
+        inset: 62px auto 0 0;
+        width: min(290px, 86vw);
+        box-shadow: 8px 0 28px rgba(32, 43, 38, .12);
+        transform: translateX(-105%);
+        transition: transform .2s ease;
+      }
+
+      .chat-sidebar.is-open {
+        transform: translateX(0);
+      }
+
+      .chat-sidebar.is-collapsed {
+        width: min(290px, 86vw);
+        border-right: 1px solid var(--line);
+      }
+
+      .app-shell {
+        min-height: 0;
+      }
+
+
+      .user-turn {
+        max-width: 88%;
+      }
+    }
+
+    @media(prefers-reduced-motion:reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="text-[#202b26] antialiased">
+  {% include "components/header.html" %}
+  <div class="app-shell">
+    <aside id="chat-sidebar" class="chat-sidebar" aria-label="Primary navigation and chat history">
+      <a class="sidebar-new-chat" href="/" hx-get="/" hx-select="main[data-conversation-id]" hx-target="#chat-view"
+        hx-swap="innerHTML" hx-push-url="/" hx-indicator="#chat-loading" aria-label="Start a new meal analysis chat">
+        <span aria-hidden="true" class="text-lg leading-none">+</span><span>New meal chat</span>
+      </a>
+
+      <nav aria-label="Features" class="mb-2">
+        <a class="sidebar-nav-link" href="/tracker" data-sidebar-link {% if current_path=='/tracker'
+          %}aria-current="page" {% endif %} hx-get="/tracker" hx-select="main[data-page='tracker']"
+          hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/tracker" hx-indicator="#chat-loading">
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18" />
+              <path d="M18 17V9" />
+              <path d="M13 17V5" />
+              <path d="M8 17v-3" />
+            </svg>
+          </span>
+          <span>Tracker</span>
+        </a>
+        <a class="sidebar-nav-link" href="/meal-plan" data-sidebar-link {% if current_path=='/meal-plan'
+          %}aria-current="page" {% endif %} hx-get="/meal-plan" hx-select="main[data-page='meal-plan']"
+          hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/meal-plan" hx-indicator="#chat-loading">
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </span>
+          <span>Meal Planner</span>
+        </a>
+        <a class="sidebar-nav-link" href="/groups" data-sidebar-link {% if current_path=='/groups' %}aria-current="page"
+          {% endif %} hx-get="/groups" hx-select="main[data-page='groups']" hx-target="#chat-view" hx-swap="innerHTML"
+          hx-push-url="/groups" hx-indicator="#chat-loading">
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <span>Nutrition Groups</span>
+        </a>
+        <a class="sidebar-nav-link" href="/profile" data-sidebar-link {% if current_path=='/profile'
+          %}aria-current="page" {% endif %} hx-get="/profile" hx-select="main[data-page='profile']"
+          hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/profile" hx-indicator="#chat-loading">
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </span>
+          <span>User Profile</span>
+        </a>
+        <a class="sidebar-nav-link" href="/login" data-sidebar-link {% if current_path in ['/login', '/signup' , '/auth'
+          ] %}aria-current="page" {% endif %} hx-get="/login" hx-select="main[data-page='auth']" hx-target="#chat-view"
+          hx-swap="innerHTML" hx-push-url="/login" hx-indicator="#chat-loading">
+          <span class="sidebar-nav-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </span>
+          <span>{% if current_user %}Account (@{{ current_user.username }}){% else %}Login / Sign Up{% endif %}</span>
+        </a>
+      </nav>
+
+      <p class="sidebar-section-title">Your chats</p>
+      {% include "components/history_items.html" %}
+    </aside>
+    <div id="chat-view">{% block content %}{% endblock %}</div>
+  </div>
+  <!-- Centered Mildly Blurred & Dimmed Loading Overlay for All Tabs -->
+  <div id="chat-loading" class="htmx-indicator page-loading-overlay" role="status" aria-live="polite" aria-label="Loading page content">
+    <div class="page-loading-card">
+      <div class="page-loading-spinner" aria-hidden="true"></div>
+      <div class="page-loading-content">
+        <strong id="page-loading-title" class="page-loading-title">Loading view...</strong>
+        <p id="page-loading-sub" class="page-loading-sub">Fetching verified nutrient data</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Sidebar toggle
+    document.getElementById("sidebar-toggle")?.addEventListener("click", () => {
+      const sidebar = document.getElementById("chat-sidebar");
+      const toggle = document.getElementById("sidebar-toggle");
+      const mobile = window.matchMedia("(max-width: 720px)").matches;
+      const open = mobile ? !sidebar.classList.contains("is-open") : sidebar.classList.contains("is-collapsed");
+      sidebar.classList.toggle("is-open", mobile && open);
+      sidebar.classList.toggle("is-collapsed", !mobile && !open);
+      toggle.setAttribute("aria-expanded", String(open));
+    });
+
+    // Open-source Lucide SVG icons for Breakfast, Lunch, Snacks, Dinner
+    const MEAL_SECTION_META = {
+      breakfast: {
+        label: "Breakfast",
+        subtitle: "Morning nourishment & steady metabolic start",
+        iconClass: "meal-icon-breakfast",
+        svg: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>'
+      },
+      lunch: {
+        label: "Lunch",
+        subtitle: "Balanced midday fuel & sustained focus",
+        iconClass: "meal-icon-lunch",
+        svg: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>'
+      },
+      snacks: {
+        label: "Snacks",
+        subtitle: "Smart afternoon bridge between meals",
+        iconClass: "meal-icon-snacks",
+        svg: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>'
+      },
+      dinner: {
+        label: "Dinner",
+        subtitle: "Light, restorative evening meal",
+        iconClass: "meal-icon-dinner",
+        svg: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/><path d="M19 3v4"/><path d="M21 5h-4"/></svg>'
+      }
+    };
+
+    const DIET_LABELS = {
+      "veg": "Vegetarian (Veg)",
+      "non-veg": "Non-Vegetarian",
+      "vegan": "Vegan",
+      "egg": "Eggetarian (Egg)"
+    };
+
+    const DURATION_LABELS = {
+      "daily": "Daily Plan",
+      "weekly": "Weekly Plan (7 Days)",
+      "monthly": "Monthly Plan (4 Weeks)"
+    };
+
+    let mealPlanHistory = [];
+    let mpRecording = { stream: null, recorder: null, chunks: [], imageUrl: null };
+    let groupsCache = { my_groups: [], public_groups: [] };
+    let trackerCache = null;
+    let activeTrackerPeriod = "daily";
+
+    function showFeedback(elId, message, isError = false) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!message) {
+        el.classList.add("hidden");
+        return;
+      }
+      el.textContent = message;
+      el.className = isError
+        ? "mb-4 rounded-lg border border-[#f1d8d1] bg-[#fff9f7] p-3.5 text-sm text-[#9d4534]"
+        : "mb-4 rounded-lg border border-[#bfd4c4] bg-[#f4f8f2] p-3.5 text-sm text-[#173c2c]";
+    }
+
+    function openModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.remove("hidden");
+    }
+
+    function closeModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (modal) modal.classList.add("hidden");
+    }
+
+    // =========================================================================
+    // Upgrade 3: Instant Interactive Strong Password Evaluation & Generator
+    // =========================================================================
+    function evaluatePasswordStrength(password) {
+      const pw = String(password || "");
+      const rules = {
+        length: pw.length >= 8,
+        upper: /[A-Z]/.test(pw),
+        lower: /[a-z]/.test(pw),
+        digit: /[0-9]/.test(pw),
+        special: /[^A-Za-z0-9\s]/.test(pw),
+      };
+      const score = Object.values(rules).filter(Boolean).length;
+      return { rules, score, isStrong: score === 5 };
+    }
+
+    function updatePasswordStrengthUI(password) {
+      const { rules, score } = evaluatePasswordStrength(password);
+      const badge = document.getElementById("password-strength-badge");
+      const barsContainer = document.getElementById("password-strength-bars");
+      const bars = document.querySelectorAll("#password-strength-bars .pw-strength-seg, #password-strength-bars [data-pw-bar]");
+
+      const colorMap = {
+        0: "#dfe6dc",
+        1: "#c65a42",
+        2: "#d97706",
+        3: "#d97706",
+        4: "#3b82f6",
+        5: "#1f7a44",
+      };
+      const labelMap = {
+        0: { text: "Enter password", cls: "badge-pill badge-amber !py-0.5 !px-2.5 !text-[10.5px]" },
+        1: { text: "Very Weak (1/5)", cls: "badge-pill badge-coral !py-0.5 !px-2.5 !text-[10.5px]" },
+        2: { text: "Weak (2/5)", cls: "badge-pill badge-coral !py-0.5 !px-2.5 !text-[10.5px]" },
+        3: { text: "Fair (3/5)", cls: "badge-pill badge-amber !py-0.5 !px-2.5 !text-[10.5px]" },
+        4: { text: "Almost Strong (4/5)", cls: "badge-pill badge-blue !py-0.5 !px-2.5 !text-[10.5px]" },
+        5: { text: "Strong Password ✓", cls: "badge-pill badge-green !py-0.5 !px-2.5 !text-[10.5px]" },
+      };
+
+      if (barsContainer) barsContainer.setAttribute("aria-valuenow", String(score));
+      bars.forEach((bar, i) => {
+        const idx = bar.dataset.pwBar ? parseInt(bar.dataset.pwBar, 10) : (i + 1);
+        bar.style.backgroundColor = idx <= score ? colorMap[score] : "#dfe6dc";
+      });
+
+      if (badge) {
+        const meta = labelMap[score] || labelMap[0];
+        badge.textContent = meta.text;
+        badge.className = meta.cls;
+      }
+
+      document.querySelectorAll("[data-pw-check], [data-pw-rule]").forEach((li) => {
+        const key = li.dataset.pwCheck || li.dataset.pwRule;
+        const met = Boolean(rules[key]);
+        const icon = li.querySelector(".pw-check-icon, [data-pw-icon]");
+        li.className = met ? "pw-check-item flex items-center gap-2 font-semibold text-[#1f7a44]" : "pw-check-item flex items-center gap-2 text-[#6d7871]";
+        if (icon) {
+          icon.textContent = met ? "✓" : "○";
+          icon.className = met
+            ? "pw-check-icon inline-grid h-4 w-4 place-items-center rounded-full bg-[#1f7a44] text-[10px] font-bold text-white"
+            : "pw-check-icon inline-grid h-4 w-4 place-items-center rounded-full border border-[#c5d1c6] bg-white text-[10px] font-bold";
+        }
+      });
+    }
+
+    function generateStrongPassword() {
+      const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+      const lower = "abcdefghijkmnopqrstuvwxyz";
+      const digits = "23456789";
+      const specials = "!@#$%^&*_-+=";
+      const all = upper + lower + digits + specials;
+      const pick = (chars) => chars[Math.floor(Math.random() * chars.length)];
+      const chars = [pick(upper), pick(upper), pick(lower), pick(lower), pick(digits), pick(digits), pick(specials), pick(specials)];
+      for (let i = 0; i < 6; i++) chars.push(pick(all));
+      // Shuffle
+      for (let i = chars.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+      }
+      return chars.join("");
+    }
+
+    // =========================================================================
+    // Meal Planner Functions (with Delete Meal Plan button)
+    // =========================================================================
+    function setMealPlanError(message) {
+      const error = document.getElementById("meal-plan-error");
+      if (!error) return;
+      error.textContent = message;
+      error.classList.toggle("hidden", !message);
+    }
+
+    function syncMealPlanModeUI(isGenerating = false) {
+      const mpForm = document.getElementById("meal-plan-form");
+      if (!mpForm) return;
+      const duration = mpForm.querySelector('input[name="duration"]:checked')?.value || "daily";
+      const dietType = mpForm.querySelector('input[name="diet_type"]:checked')?.value || "veg";
+      const durLabel = DURATION_LABELS[duration] || `${duration} Plan`;
+      const dietLabel = DIET_LABELS[dietType] || dietType;
+
+      const activeBadge = document.getElementById("meal-plan-active-mode-badge");
+      if (activeBadge) {
+        activeBadge.textContent = isGenerating
+          ? `Generating ${durLabel} · ${dietLabel}…`
+          : `${durLabel} · ${dietLabel}`;
+      }
+
+      const submitBtn = document.getElementById("generate-meal-plan");
+      if (submitBtn && !submitBtn.disabled && !isGenerating) {
+        const labelEl = document.getElementById("generate-meal-plan-label");
+        if (labelEl) {
+          labelEl.textContent = `Create ${duration} meal plan`;
+        }
+      }
+    }
+
+    function renderMealPlan(record) {
+      const result = document.getElementById("meal-plan-result");
+      if (!result || !record?.plan) return;
+      const plan = record.plan;
+      document.getElementById("meal-plan-summary").textContent = plan.summary || "";
+
+      const metaBadges = document.getElementById("meal-plan-meta-badges");
+      if (metaBadges) {
+        metaBadges.replaceChildren();
+        const dur = record.duration || plan.duration || "daily";
+        const diet = record.diet_type || plan.diet_type || "";
+        if (dur) {
+          const b = document.createElement("span");
+          b.className = "badge-pill badge-green";
+          b.textContent = DURATION_LABELS[dur] || dur.toUpperCase();
+          metaBadges.append(b);
+        }
+        if (diet) {
+          const b = document.createElement("span");
+          b.className = diet === "non-veg" ? "badge-pill badge-coral" : (diet === "egg" ? "badge-pill badge-amber" : "badge-pill badge-blue");
+          b.textContent = DIET_LABELS[diet] || diet;
+          metaBadges.append(b);
+        }
+      }
+
+      const transcriptEl = document.getElementById("meal-plan-transcription");
+      const transcriptText = record.transcription || plan.transcription || "";
+      if (transcriptEl) {
+        if (transcriptText) {
+          transcriptEl.textContent = "Voice note transcribed: \"" + transcriptText + "\"";
+          transcriptEl.classList.remove("hidden");
+        } else {
+          transcriptEl.classList.add("hidden");
+        }
+      }
+
+      const sections = document.getElementById("meal-plan-sections");
+      sections.replaceChildren();
+
+      for (const key of ["breakfast", "lunch", "snacks", "dinner"]) {
+        const meta = MEAL_SECTION_META[key];
+        const options = plan[key]?.options || [];
+
+        const section = document.createElement("section");
+        section.className = "meal-section-card";
+
+        const header = document.createElement("div");
+        header.className = "meal-section-header";
+
+        const titleGroup = document.createElement("div");
+        titleGroup.className = "meal-section-title-group";
+
+        const iconBox = document.createElement("span");
+        iconBox.className = `meal-section-icon ${meta.iconClass}`;
+        iconBox.innerHTML = meta.svg;
+
+        const textWrap = document.createElement("div");
+        const heading = document.createElement("h2");
+        heading.className = "serif m-0 text-2xl text-[#173c2c]";
+        heading.textContent = meta.label;
+        const sub = document.createElement("span");
+        sub.className = "meal-section-subtitle";
+        sub.textContent = meta.subtitle;
+        textWrap.append(heading, sub);
+
+        titleGroup.append(iconBox, textWrap);
+
+        const countBadge = document.createElement("span");
+        countBadge.className = "badge-pill badge-green";
+        countBadge.textContent = `${options.length} ${options.length === 1 ? "option" : "options"}`;
+
+        header.append(titleGroup, countBadge);
+        section.append(header);
+
+        options.forEach((option, idx) => {
+          const article = document.createElement("article");
+          article.className = "meal-option-card";
+
+          const optBadge = document.createElement("span");
+          optBadge.className = "meal-option-badge";
+          optBadge.textContent = `Option ${idx + 1}`;
+
+          const title = document.createElement("h3");
+          title.className = "meal-option-title";
+          title.textContent = option.name || "Meal idea";
+
+          const details = document.createElement("p");
+          details.className = "meal-option-details";
+          details.textContent = option.details || "";
+
+          const reason = document.createElement("p");
+          reason.className = "meal-option-why";
+          reason.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:2px" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+          const reasonSpan = document.createElement("span");
+          reasonSpan.textContent = option.why_it_fits || "";
+          reason.append(reasonSpan);
+
+          article.append(optBadge, title, details, reason);
+          section.append(article);
+        });
+
+        sections.append(section);
+      }
+
+      result.classList.remove("hidden");
+      result.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderMealPlanHistory() {
+      const container = document.getElementById("meal-plan-history-list");
+      if (!container) return;
+      container.replaceChildren();
+      const count = document.getElementById("meal-plan-history-count");
+      if (count) count.textContent = String(mealPlanHistory.length);
+      const status = document.getElementById("meal-plan-history-status");
+      if (status) status.textContent = mealPlanHistory.length ? "" : "Your meal plans will appear here after you create one.";
+      for (const record of mealPlanHistory) {
+        const row = document.createElement("div");
+        row.className = "meal-plan-history-row";
+        row.dataset.mealPlanRowId = record.id;
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "meal-plan-history-item";
+        button.dataset.mealPlanId = record.id;
+        button.setAttribute("aria-current", "false");
+        const title = document.createElement("span");
+        title.className = "block truncate text-xs font-bold text-[#173c2c]";
+        title.textContent = record.title;
+        const metaLine = document.createElement("span");
+        metaLine.className = "mt-1 flex items-center gap-1.5 text-[10px] text-[#6d7871]";
+        const dur = record.plan?.duration ? record.plan.duration.toUpperCase() : "DAILY";
+        const diet = record.plan?.diet_type ? ` · ${record.plan.diet_type.toUpperCase()}` : "";
+        metaLine.textContent = `${dur}${diet} · ${new Date(record.created_at).toLocaleDateString()}`;
+        button.append(title, metaLine);
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "chat-delete-btn";
+        delBtn.dataset.deleteMealPlanId = record.id;
+        delBtn.title = "Delete this meal plan";
+        delBtn.setAttribute("aria-label", `Delete meal plan ${record.title}`);
+        delBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+        row.append(button, delBtn);
+        container.append(row);
+      }
+    }
+
+    async function loadMealPlanHistory() {
+      if (!document.querySelector('[data-page="meal-plan"]')) return;
+      const status = document.getElementById("meal-plan-history-status");
+      try {
+        const response = await fetch("/meal-plans/history", { headers: { Accept: "application/json" } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Could not load previous meal plans.");
+        mealPlanHistory = payload;
+        renderMealPlanHistory();
+      } catch (error) {
+        if (status) status.textContent = error.message || "Could not load previous meal plans.";
+      }
+    }
+
+    // Meal Plan Attachment Chips & Voice Recording
+    function updateMealPlanAttachmentChips() {
+      const container = document.getElementById("meal-plan-attachment-chips");
+      if (!container) return;
+      container.replaceChildren();
+      const imgInput = document.getElementById("meal-plan-image");
+      const voiceInput = document.getElementById("meal-plan-voice");
+
+      if (imgInput?.files?.length) {
+        const file = imgInput.files[0];
+        if (!mpRecording.imageUrl) {
+          mpRecording.imageUrl = URL.createObjectURL(file);
+        }
+        const chip = document.createElement("span");
+        chip.className = "attachment-chip";
+        const thumb = document.createElement("img");
+        thumb.src = mpRecording.imageUrl;
+        thumb.alt = file.name;
+        thumb.className = "attachment-thumbnail";
+        const label = document.createElement("span");
+        label.className = "attachment-chip-label";
+        label.textContent = file.name;
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "attachment-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remove photo";
+        removeBtn.addEventListener("click", () => {
+          imgInput.value = "";
+          if (mpRecording.imageUrl) {
+            URL.revokeObjectURL(mpRecording.imageUrl);
+            mpRecording.imageUrl = null;
+          }
+          updateMealPlanAttachmentChips();
+        });
+        chip.append(thumb, label, removeBtn);
+        container.append(chip);
+      }
+
+      if (voiceInput?.files?.length) {
+        const file = voiceInput.files[0];
+        const chip = document.createElement("span");
+        chip.className = "attachment-chip";
+        const icon = document.createElement("span");
+        icon.textContent = "♫";
+        const label = document.createElement("span");
+        label.className = "attachment-chip-label";
+        label.textContent = file.name || "Voice note.wav";
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "attachment-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remove voice note";
+        removeBtn.addEventListener("click", () => {
+          voiceInput.value = "";
+          updateMealPlanAttachmentChips();
+        });
+        chip.append(icon, label, removeBtn);
+        container.append(chip);
+      }
+    }
+
+    function encodeAudioBufferToWav(audioBuffer) {
+      const numChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const channels = [];
+      for (let i = 0; i < numChannels; i++) {
+        channels.push(audioBuffer.getChannelData(i));
+      }
+      const frameCount = channels[0].length;
+      const dataSize = frameCount * numChannels * 2;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+      const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + dataSize, true);
+      writeStr(8, "WAVEfmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numChannels * 2, true);
+      view.setUint16(32, numChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, dataSize, true);
+      let offset = 44;
+      for (let f = 0; f < frameCount; f++) {
+        for (let c = 0; c < numChannels; c++) {
+          const s = Math.max(-1, Math.min(1, channels[c][f]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+          offset += 2;
+        }
+      }
+      return new Blob([buffer], { type: "audio/wav" });
+    }
+
+    async function toggleMealPlanRecording() {
+      const micBtn = document.getElementById("meal-plan-mic-btn");
+      const micLabel = document.getElementById("meal-plan-mic-label");
+      const status = document.getElementById("meal-plan-recording-status");
+
+      if (mpRecording.recorder) {
+        const recorder = mpRecording.recorder;
+        const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
+        recorder.stop();
+        await stopped;
+        if (mpRecording.stream) {
+          mpRecording.stream.getTracks().forEach((t) => t.stop());
+        }
+        mpRecording.stream = null;
+        mpRecording.recorder = null;
+        micBtn?.classList.remove("recording");
+        if (micLabel) micLabel.textContent = "Voice Note";
+        status?.classList.add("hidden");
+        status?.classList.remove("inline-flex");
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioCtx();
+        try {
+          const blob = new Blob(mpRecording.chunks, { type: recorder.mimeType || "audio/webm" });
+          const audioBuffer = await audioCtx.decodeAudioData(await blob.arrayBuffer());
+          const wavBlob = encodeAudioBufferToWav(audioBuffer);
+          const file = new File([wavBlob], "meal-plan-voice.wav", { type: "audio/wav" });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          const voiceInput = document.getElementById("meal-plan-voice");
+          if (voiceInput) voiceInput.files = dt.files;
+          updateMealPlanAttachmentChips();
+        } catch (err) {
+          setMealPlanError("Could not process voice recording. Try a shorter note or upload an audio file.");
+        } finally {
+          mpRecording.chunks = [];
+          await audioCtx.close();
+        }
+        return;
+      }
+
+      setMealPlanError("");
+      try {
+        mpRecording.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mpRecording.recorder = new MediaRecorder(mpRecording.stream);
+        mpRecording.chunks = [];
+        mpRecording.recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) mpRecording.chunks.push(e.data);
+        };
+        mpRecording.recorder.start();
+        micBtn?.classList.add("recording");
+        if (micLabel) micLabel.textContent = "Stop Recording";
+        status?.classList.remove("hidden");
+        status?.classList.add("inline-flex");
+      } catch (err) {
+        setMealPlanError("Microphone access failed: " + (err.message || err));
+      }
+    }
+
+    // =========================================================================
+    // Upgrade 2: Groups Directory, Public Search & Group Modals
+    // =========================================================================
+    function renderGroupDirectoryList(containerId, groups, isPublicTab = false) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.replaceChildren();
+      if (!groups.length) {
+        const empty = document.createElement("div");
+        empty.className = "rounded-xl border border-dashed border-[#c8d8ca] bg-[#f8fbf7] p-5 text-center";
+        if (isPublicTab) {
+          empty.innerHTML = `<p class="m-0 text-xs text-[#6d7871]">No matching public groups found.</p>`;
+        } else {
+          empty.innerHTML = `
+            <p class="serif m-0 text-lg text-[#173c2c]">You haven't joined any groups yet</p>
+            <p class="m-0 mt-1 text-xs leading-relaxed text-[#53645a]">
+              Create your own private or public group, or search the public directory on the right to join an existing community.
+            </p>
+            <div class="group-empty-state-actions">
+              <button type="button" class="btn-primary !py-2 !px-3.5 !text-xs open-create-group-trigger">+ Create a Group</button>
+              <button type="button" class="btn-secondary !py-2 !px-3.5 !text-xs focus-public-search-trigger">Search Public Groups</button>
+            </div>
+          `;
+        }
+        container.append(empty);
+        return;
+      }
+
+      for (const grp of groups) {
+        const card = document.createElement("div");
+        card.className = "group-list-card";
+        card.dataset.groupCardId = grp.id;
+
+        const left = document.createElement("div");
+        left.className = "min-w-0 flex-1";
+        const topRow = document.createElement("div");
+        topRow.className = "mb-1 flex flex-wrap items-center gap-1.5";
+        const nameEl = document.createElement("strong");
+        nameEl.className = "truncate text-sm font-bold text-[#173c2c]";
+        nameEl.textContent = grp.name;
+        const badge = document.createElement("span");
+        badge.className = grp.is_public ? "badge-pill badge-green !py-0.5 !px-2 !text-[10px]" : "badge-pill badge-amber !py-0.5 !px-2 !text-[10px]";
+        badge.textContent = grp.is_public ? "Public" : "Private";
+        topRow.append(nameEl, badge);
+        if (grp.is_member && isPublicTab) {
+          const memberBadge = document.createElement("span");
+          memberBadge.className = "badge-pill badge-blue !py-0.5 !px-2 !text-[10px]";
+          memberBadge.textContent = "Joined";
+          topRow.append(memberBadge);
+        }
+
+        const desc = document.createElement("p");
+        desc.className = "m-0 truncate text-xs text-[#6d7871]";
+        desc.textContent = grp.description || "Shared collective nutrition group";
+
+        const stats = document.createElement("p");
+        stats.className = "m-0 mt-1 text-[11px] font-semibold text-[#245c43]";
+        stats.textContent = `${grp.member_count} ${grp.member_count === 1 ? "member" : "members"} · ${Math.round(grp.total_calories_kcal || 0)} kcal · ${(grp.total_protein_g || 0).toFixed(1)}g protein`;
+
+        left.append(topRow, desc, stats);
+
+        const actions = document.createElement("div");
+        actions.className = "flex items-center gap-2";
+        if (isPublicTab && !grp.is_member) {
+          const joinBtn = document.createElement("button");
+          joinBtn.type = "button";
+          joinBtn.className = "btn-secondary !py-1.5 !px-3 !text-xs";
+          joinBtn.dataset.joinGroupId = grp.id;
+          joinBtn.textContent = "Join";
+          actions.append(joinBtn);
+        }
+        const viewBtn = document.createElement("button");
+        viewBtn.type = "button";
+        viewBtn.className = "btn-primary !py-1.5 !px-3 !text-xs";
+        viewBtn.dataset.openGroupId = grp.id;
+        viewBtn.textContent = "Open Details";
+        actions.append(viewBtn);
+
+        card.append(left, actions);
+        container.append(card);
+      }
+    }
+
+    function renderGroupDashboard(group) {
+      if (!group) return;
+      openModal("group-detail-modal");
+
+      document.getElementById("active-group-id").value = group.id;
+      document.getElementById("active-group-name").textContent = group.name;
+      document.getElementById("active-group-description").textContent = group.description || "Tracking collective nutrition together.";
+      const badge = document.getElementById("active-group-badge");
+      if (badge) {
+        badge.className = group.is_public ? "badge-pill badge-green" : "badge-pill badge-amber";
+        badge.textContent = group.is_public ? "Public Group (Unique Name)" : "Private Group";
+      }
+      const creatorEl = document.getElementById("active-group-creator");
+      if (creatorEl) creatorEl.textContent = `Created by @${group.created_by}`;
+
+      const col = group.collective_nutrition || {};
+      const summaryEl = document.getElementById("collective-meals-summary");
+      if (summaryEl) summaryEl.textContent = `${col.total_meals_count || 0} meals tracked across ${col.total_members || 0} members`;
+      document.getElementById("collective-calories").innerHTML = `${Math.round(col.total_calories_kcal || 0)} <small>kcal</small>`;
+      document.getElementById("collective-avg-calories").textContent = `${Math.round(col.average_calories_per_member || 0)} kcal avg / member`;
+      document.getElementById("collective-protein").innerHTML = `${(col.total_protein_g || 0).toFixed(1)} <small>g</small>`;
+      document.getElementById("collective-carbs").innerHTML = `${(col.total_carbohydrates_g || 0).toFixed(1)} <small>g</small>`;
+      const colFat = document.getElementById("collective-fat");
+      if (colFat) colFat.innerHTML = `${(col.total_fat_g || 0).toFixed(1)} <small>g</small>`;
+      const colFiber = document.getElementById("collective-fiber");
+      if (colFiber) colFiber.innerHTML = `${(col.total_fiber_g || 0).toFixed(1)} <small>g</small>`;
+
+      const membersContainer = document.getElementById("group-members-list");
+      membersContainer.replaceChildren();
+      const totalCals = Math.max(col.total_calories_kcal || 0, 1);
+
+      for (const m of group.members || []) {
+        const nut = m.nutrition || {};
+        const sharePct = col.total_calories_kcal > 0 ? Math.min(100, Math.round(((nut.calories_kcal || 0) / totalCals) * 100)) : 0;
+        const avatarHtml = m.profile_picture
+          ? `<img src="${m.profile_picture}" alt="${m.username}" class="h-full w-full rounded-full object-cover">`
+          : (m.name || m.username || "U")[0].toUpperCase();
+        const row = document.createElement("div");
+        row.className = "member-row-card";
+        row.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <span class="topbar-avatar">${avatarHtml}</span>
+              <div>
+                <strong class="text-xs font-bold text-[#173c2c]">${m.name || m.username}</strong>
+                <span class="ml-1 text-[11px] text-[#6d7871]">@${m.username}</span>
+                <span class="ml-1.5 badge-pill ${m.role === 'admin' ? 'badge-green' : 'badge-blue'} !py-0.5 !px-2 !text-[9px]">${m.role}</span>
+              </div>
+            </div>
+            <span class="text-xs font-bold text-[#245c43]">${Math.round(nut.calories_kcal || 0)} kcal <span class="font-normal text-[#6d7871]">(${nut.meals_count || 0} meals)</span></span>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-3 text-[11px] text-[#53645a]">
+            <span>Protein: <strong>${(nut.protein_g || 0).toFixed(1)}g</strong></span>
+            <span>Carbs: <strong>${(nut.carbohydrates_g || 0).toFixed(1)}g</strong></span>
+            <span>Fat: <strong>${(nut.total_fat_g || 0).toFixed(1)}g</strong></span>
+            <span>Fiber: <strong>${(nut.dietary_fiber_g || 0).toFixed(1)}g</strong></span>
+          </div>
+          <div class="member-progress-track" title="${sharePct}% of collective group calories">
+            <div class="member-progress-fill" style="width:${sharePct}%"></div>
+          </div>
+        `;
+        membersContainer.append(row);
+      }
+
+      const mealsContainer = document.getElementById("group-recent-meals");
+      mealsContainer.replaceChildren();
+      const meals = (group.recent_meals || []).slice(0, 5);
+      if (!meals.length) {
+        const empty = document.createElement("p");
+        empty.className = "m-0 rounded-lg border border-dashed border-[#d5ded4] p-4 text-center text-xs text-[#748078]";
+        empty.textContent = "No meals logged yet. Log a meal above or use the 'Log to Tracker' button in Chat!";
+        mealsContainer.append(empty);
+      } else {
+        for (const item of meals) {
+          const card = document.createElement("div");
+          card.className = "rounded-xl border border-[#e2e8df] bg-white p-3.5";
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+              <strong class="text-xs font-bold text-[#173c2c]">${item.meal_title}</strong>
+              <span class="badge-pill badge-green !py-0.5 !px-2 !text-[10px]">${Math.round(item.calories_kcal || 0)} kcal</span>
+            </div>
+            <p class="m-0 mt-1 text-[11px] text-[#6d7871]">
+              By <strong>@${item.username}</strong> · ${item.meal_type || "Meal"} · P: ${(item.protein_g || 0).toFixed(1)}g · C: ${(item.carbohydrates_g || 0).toFixed(1)}g · F: ${(item.total_fat_g || 0).toFixed(1)}g
+            </p>
+          `;
+          mealsContainer.append(card);
+        }
+      }
+    }
+
+    async function loadGroupsDirectory(searchQuery = "") {
+      if (!document.querySelector('[data-page="groups"]')) return;
+      const status = document.getElementById("groups-directory-status");
+      try {
+        const qParam = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : "";
+        const response = await fetch(`/groups/data${qParam}`, { headers: { Accept: "application/json" } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Could not load groups.");
+        groupsCache = payload;
+        const myCount = document.getElementById("my-groups-count");
+        if (myCount) myCount.textContent = String((payload.my_groups || []).length);
+        const pubCount = document.getElementById("public-groups-count");
+        if (pubCount) pubCount.textContent = String((payload.public_groups || []).length);
+        if (status) status.textContent = "";
+        renderGroupDirectoryList("my-groups-list", payload.my_groups || [], false);
+        renderGroupDirectoryList("public-groups-list", payload.public_groups || [], true);
+      } catch (err) {
+        if (status) status.textContent = err.message || "Could not load groups.";
+      }
+    }
+
+    async function openGroupDetail(groupId) {
+      try {
+        const response = await fetch(`/groups/${groupId}/data`, { headers: { Accept: "application/json" } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Could not load group details.");
+        renderGroupDashboard(payload);
+      } catch (err) {
+        showFeedback("group-page-feedback", err.message || "Could not open group.", true);
+      }
+    }
+
+    // =========================================================================
+    // Upgrade 6: Dedicated Nutrition Tracker (Daily / Weekly / Monthly)
+    // =========================================================================
+    function initTrackerFromDOM() {
+      const scriptEl = document.getElementById("initial-tracker-data");
+      if (scriptEl && scriptEl.textContent.trim()) {
+        try {
+          trackerCache = JSON.parse(scriptEl.textContent);
+        } catch (_) {
+          trackerCache = null;
+        }
+      }
+    }
+
+    function renderTrackerPeriod(periodKey) {
+      activeTrackerPeriod = periodKey || "daily";
+      document.querySelectorAll("[data-tracker-tab]").forEach((btn) => {
+        const isSelected = btn.dataset.trackerTab === activeTrackerPeriod;
+        btn.classList.toggle("is-active", isSelected);
+        btn.setAttribute("aria-selected", String(isSelected));
+      });
+
+      const periodData = trackerCache?.periods?.[activeTrackerPeriod];
+      if (!periodData) return;
+
+      const macros = periodData.macronutrients || {};
+      const micros = periodData.micronutrients || { vitamins: [], minerals: [] };
+      const meals = periodData.meals || [];
+
+      const periodBadge = document.getElementById("tracker-period-badge");
+      if (periodBadge) periodBadge.textContent = periodData.label || activeTrackerPeriod.toUpperCase();
+
+      const countBadge = document.getElementById("tracker-meals-count-badge");
+      if (countBadge) countBadge.textContent = `${periodData.meals_count || 0} ${(periodData.meals_count || 0) === 1 ? "meal" : "meals"} logged`;
+
+      const avgBadge = document.getElementById("tracker-daily-avg-badge");
+      if (avgBadge) {
+        avgBadge.innerHTML = `Avg: <strong class="text-[#173c2c]">${Math.round(periodData.daily_average_calories_kcal || 0)} kcal / day</strong>`;
+      }
+
+      // Hero Cards
+      const heroCals = document.getElementById("tracker-hero-calories");
+      if (heroCals) heroCals.innerHTML = `${Math.round(macros.calories_kcal || 0)} <small>kcal</small>`;
+      const heroCalsSub = document.getElementById("tracker-hero-calories-sub");
+      if (heroCalsSub) heroCalsSub.textContent = `Across ${periodData.meals_count || 0} logged meals`;
+      const heroProt = document.getElementById("tracker-hero-protein");
+      if (heroProt) heroProt.innerHTML = `${(macros.protein_g || 0).toFixed(1)} <small>g</small>`;
+      const heroCarbs = document.getElementById("tracker-hero-carbs");
+      if (heroCarbs) heroCarbs.innerHTML = `${(macros.carbohydrates_g || 0).toFixed(1)} <small>g</small>`;
+      const heroCarbsSub = document.getElementById("tracker-hero-carbs-sub");
+      if (heroCarbsSub) heroCarbsSub.textContent = `Sugars: ${(macros.total_sugars_g || 0).toFixed(1)}g`;
+      const heroFat = document.getElementById("tracker-hero-fat");
+      if (heroFat) heroFat.innerHTML = `${(macros.total_fat_g || 0).toFixed(1)} <small>g</small>`;
+      const heroSatChol = document.getElementById("tracker-hero-sat-chol");
+      if (heroSatChol) heroSatChol.textContent = `Sat: ${(macros.saturated_fat_g || 0).toFixed(1)}g · Trans: ${(macros.trans_fat_g || 0).toFixed(1)}g`;
+      const heroFiber = document.getElementById("tracker-hero-fiber");
+      if (heroFiber) heroFiber.innerHTML = `${(macros.dietary_fiber_g || 0).toFixed(1)} <small>g</small>`;
+      const heroFiberSub = document.getElementById("tracker-hero-fiber-sub");
+      if (heroFiberSub) heroFiberSub.textContent = "Digestive wellness & gut satiety";
+
+      // 13 Macronutrients list
+      document.querySelectorAll("#tracker-macros-list [data-macro-key]").forEach((dd) => {
+        const key = dd.dataset.macroKey;
+        const unit = dd.dataset.macroUnit || "g";
+        const val = Number(macros[key] || 0);
+        const formatted = unit === "kcal" || unit === "mg" ? val.toFixed(1) : val.toFixed(2);
+        dd.textContent = `${formatted} ${unit}`;
+      });
+
+      // Vitamins list
+      const vitCount = document.getElementById("tracker-vitamins-count");
+      const vitList = document.getElementById("tracker-vitamins-list");
+      const vitamins = micros.vitamins || [];
+      if (vitCount) vitCount.textContent = `${vitamins.length} tracked`;
+      if (vitList) {
+        vitList.replaceChildren();
+        if (!vitamins.length) {
+          vitList.innerHTML = `<p class="m-0 rounded-xl border border-dashed border-[#d5ded4] p-5 text-center text-xs text-[#748078]">No vitamin data recorded for this period yet. Log an analyzed dish from Chat using <strong>“Log to Tracker”</strong> to populate full USDA vitamin profiles.</p>`;
+        } else {
+          for (const v of vitamins) {
+            const row = document.createElement("div");
+            row.className = "flex items-center justify-between py-2.5";
+            row.innerHTML = `<span class="font-medium text-[#53645a]">${v.name}</span><strong class="text-[#173c2c]">${Number(v.amount || 0).toFixed(2)} ${v.unit || ""}</strong>`;
+            vitList.append(row);
+          }
+        }
+      }
+
+      // Minerals list
+      const minCount = document.getElementById("tracker-minerals-count");
+      const minList = document.getElementById("tracker-minerals-list");
+      const minerals = micros.minerals || [];
+      if (minCount) minCount.textContent = `${minerals.length} tracked`;
+      if (minList) {
+        minList.replaceChildren();
+        if (!minerals.length) {
+          minList.innerHTML = `<p class="m-0 rounded-xl border border-dashed border-[#d5ded4] p-5 text-center text-xs text-[#748078]">No mineral data recorded for this period yet. Log an analyzed dish from Chat using <strong>“Log to Tracker”</strong> to populate full mineral &amp; electrolyte data.</p>`;
+        } else {
+          for (const m of minerals) {
+            const row = document.createElement("div");
+            row.className = "flex items-center justify-between py-2.5";
+            row.innerHTML = `<span class="font-medium text-[#53645a]">${m.name}</span><strong class="text-[#173c2c]">${Number(m.amount || 0).toFixed(2)} ${m.unit || ""}</strong>`;
+            minList.append(row);
+          }
+        }
+      }
+
+      // Meals list
+      const mealsBadge = document.getElementById("tracker-meals-section-badge");
+      if (mealsBadge) mealsBadge.textContent = `${meals.length} ${meals.length === 1 ? "entry" : "entries"}`;
+      const mealsContainer = document.getElementById("tracker-meals-list");
+      if (mealsContainer) {
+        mealsContainer.replaceChildren();
+        if (!meals.length) {
+          mealsContainer.innerHTML = `
+            <div class="rounded-xl border border-dashed border-[#d5ded4] p-8 text-center">
+              <p class="serif m-0 text-xl text-[#173c2c]">No meals logged in this period yet</p>
+              <p class="mx-auto mt-1.5 max-w-[520px] text-xs leading-relaxed text-[#6d7871]">
+                General questions in chat are never automatically added to your tracker. To log a meal, either say <em>“Log this meal to my tracker”</em> in chat/voice, click the <strong>“Log to Tracker”</strong> button next to any analyzed dish, or click <strong>“+ Log Custom Meal”</strong> above.
+              </p>
+            </div>
+          `;
+        } else {
+          for (const item of meals) {
+            const m = item.macronutrients || {};
+            const viaLabel = ["explicit_chat", "text_intent", "voice_intent"].includes(item.logged_via)
+              ? "Logged via Chat/Voice Intent"
+              : (["chat_button", "button"].includes(item.logged_via) ? "Logged via Chat Button" : "Manual Entry");
+
+            const chatTurnUrl = (item.conversation_id && item.source_message_id)
+              ? `/chats/${encodeURIComponent(item.conversation_id)}#turn-${encodeURIComponent(item.source_message_id)}`
+              : (item.conversation_id ? `/chats/${encodeURIComponent(item.conversation_id)}` : "");
+
+            const titleMarkup = chatTurnUrl
+              ? `<a href="${chatTurnUrl}" hx-get="/chats/${encodeURIComponent(item.conversation_id)}" hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="${chatTurnUrl}" hx-indicator="#chat-loading" class="group/title inline-flex items-center gap-1.5 text-sm font-bold text-[#173c2c] hover:text-[#2d6f51] hover:underline transition" title="Go to this meal in Chat">
+                  <span>${item.meal_title}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 group-hover/title:opacity-100 transition" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>`
+              : `<strong class="text-sm font-bold text-[#173c2c]">${item.meal_title}</strong>`;
+
+            const chatBtnMarkup = chatTurnUrl
+              ? `<a href="${chatTurnUrl}" hx-get="/chats/${encodeURIComponent(item.conversation_id)}" hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="${chatTurnUrl}" hx-indicator="#chat-loading" class="tracker-chat-link" title="Jump to the original chat turn where this dish was analyzed">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <span>View in Chat</span>
+                </a>`
+              : "";
+
+            const article = document.createElement("article");
+            article.className = "tracker-meal-card";
+            article.dataset.trackedMealRow = item.id;
+            article.innerHTML = `
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  ${titleMarkup}
+                  <span class="badge-pill badge-green !py-0.5 !px-2 !text-[10px]">${item.meal_type || "Meal"}</span>
+                  <span class="badge-pill badge-amber !py-0.5 !px-2.5 !text-[10.5px] font-semibold flex items-center gap-1.5" title="Consumption time">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>${item.consumed_display || item.consumed_time || "Recorded"}</span>
+                  </span>
+                  <span class="badge-pill badge-blue !py-0.5 !px-2 !text-[10px]">${viaLabel}</span>
+                </div>
+                <p class="m-0 mt-2 text-xs text-[#53645a]">
+                  <strong>${Math.round(m.calories_kcal || 0)} kcal</strong> ·
+                  Protein: <strong>${Number(m.protein_g || 0).toFixed(1)}g</strong> ·
+                  Carbs: <strong>${Number(m.carbohydrates_g || 0).toFixed(1)}g</strong> ·
+                  Fat: <strong>${Number(m.total_fat_g || 0).toFixed(1)}g</strong> ·
+                  Fiber: <strong>${Number(m.dietary_fiber_g || 0).toFixed(1)}g</strong>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                ${chatBtnMarkup}
+                <button
+                  type="button"
+                  data-delete-tracked-meal-id="${item.id}"
+                  class="turn-action-btn turn-action-delete"
+                  title="Remove this meal from your tracker"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>Delete</span>
+                </button>
+              </div>
+            `;
+            mealsContainer.append(article);
+            if (window.htmx) {
+              window.htmx.process(article);
+            }
+          }
+        }
+      }
+    }
+
+    async function loadTrackerData() {
+      if (!document.querySelector('[data-page="tracker"]')) return;
+      try {
+        const resp = await fetch(`/tracker/data?period=${encodeURIComponent(activeTrackerPeriod)}`, { headers: { Accept: "application/json" } });
+        const payload = await resp.json();
+        if (!resp.ok) throw new Error(payload.detail || "Could not load tracker data.");
+        trackerCache = payload;
+        renderTrackerPeriod(activeTrackerPeriod);
+      } catch (err) {
+        showFeedback("tracker-feedback", err.message || "Could not refresh tracker.", true);
+      }
+    }
+
+    // =========================================================================
+    // Input Event Delegation (Password Strength & Public Group Live Search)
+    // =========================================================================
+    document.body.addEventListener("input", (event) => {
+      if (event.target.id === "signup-password") {
+        updatePasswordStrengthUI(event.target.value);
+      }
+      if (event.target.id === "public-groups-search") {
+        const q = event.target.value.trim().toLowerCase();
+        const clearBtn = document.getElementById("public-groups-clear-btn");
+        if (clearBtn) clearBtn.classList.toggle("hidden", !q);
+        const allPublic = groupsCache.public_groups || [];
+        const filtered = q
+          ? allPublic.filter((g) => (g.name || "").toLowerCase().includes(q) || (g.description || "").toLowerCase().includes(q))
+          : allPublic;
+        renderGroupDirectoryList("public-groups-list", filtered, true);
+      }
+    });
+
+    // =========================================================================
+    // Global Click Delegation
+    // =========================================================================
+    document.body.addEventListener("click", async (event) => {
+      // Close Modal button or clicking backdrop directly
+      const closeModalBtn = event.target.closest("[data-close-modal]");
+      if (closeModalBtn) {
+        closeModal(closeModalBtn.dataset.closeModal);
+        return;
+      }
+      if (event.target.classList?.contains("app-modal-backdrop")) {
+        event.target.classList.add("hidden");
+        return;
+      }
+
+      // Open Create Group Modal (Disabled if not logged in)
+      const createGroupTrigger = event.target.closest("[data-open-create-group-modal]") || event.target.closest("#open-create-group-modal-btn") || event.target.closest(".open-create-group-trigger");
+      if (createGroupTrigger) {
+        if (createGroupTrigger.disabled || createGroupTrigger.getAttribute("aria-disabled") === "true") {
+          event.preventDefault();
+          event.stopPropagation();
+          showFeedback("group-create-feedback", "Please log in or sign up before creating a group.", true);
+          return;
+        }
+        const isAuth = document.querySelector('[data-page="groups"]')?.dataset.authenticated === "true";
+        if (!isAuth) {
+          event.preventDefault();
+          showFeedback("group-create-feedback", "Please log in or sign up before creating a group.", true);
+          return;
+        }
+        openModal("create-group-modal");
+        return;
+      }
+
+      // Focus Public Group Search Input
+      if (event.target.closest("#focus-public-search-btn") || event.target.closest(".focus-public-search-trigger")) {
+        const searchInput = document.getElementById("public-groups-search");
+        if (searchInput) {
+          searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+          searchInput.focus();
+        }
+        return;
+      }
+
+      // Public Group Search Button / Clear Button
+      if (event.target.closest("#public-groups-search-btn")) {
+        const q = document.getElementById("public-groups-search")?.value.trim() || "";
+        await loadGroupsDirectory(q);
+        return;
+      }
+      if (event.target.closest("#public-groups-clear-btn")) {
+        const searchInput = document.getElementById("public-groups-search");
+        if (searchInput) searchInput.value = "";
+        event.target.closest("#public-groups-clear-btn").classList.add("hidden");
+        await loadGroupsDirectory("");
+        return;
+      }
+
+      // Open Manual Tracker Modal
+      if (event.target.closest("#open-manual-tracker-modal-btn")) {
+        openModal("manual-tracker-modal");
+        return;
+      }
+
+      // Tracker Period Tab Switching (Daily / Weekly / Monthly)
+      const trackerTab = event.target.closest("[data-tracker-tab]");
+      if (trackerTab) {
+        if (!trackerCache) initTrackerFromDOM();
+        renderTrackerPeriod(trackerTab.dataset.trackerTab);
+        return;
+      }
+
+      // Delete Tracked Meal from Tracker Page
+      const deleteTrackedBtn = event.target.closest("[data-delete-tracked-meal-id]");
+      if (deleteTrackedBtn) {
+        const logId = deleteTrackedBtn.dataset.deleteTrackedMealId;
+        deleteTrackedBtn.disabled = true;
+        try {
+          const resp = await fetch(`/tracker/meals/${logId}/delete`, { method: "POST", headers: { Accept: "application/json" } });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not delete tracked meal.");
+          await loadTrackerData();
+          showFeedback("tracker-feedback", "Meal removed from your tracker.", false);
+        } catch (err) {
+          showFeedback("tracker-feedback", err.message, true);
+          deleteTrackedBtn.disabled = false;
+        }
+        return;
+      }
+
+      // Category selection card in modal
+      const modalCatCard = event.target.closest("[data-modal-category-card]");
+      if (modalCatCard) {
+        document.querySelectorAll("[data-modal-category-card]").forEach(c => c.classList.remove("is-selected"));
+        modalCatCard.classList.add("is-selected");
+        const r = modalCatCard.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+        return;
+      }
+
+      // Time option card in modal (Now vs Custom)
+      const timeOptCard = event.target.closest("[data-time-option-card]");
+      if (timeOptCard) {
+        document.querySelectorAll("[data-time-option-card]").forEach(c => c.classList.remove("is-selected"));
+        timeOptCard.classList.add("is-selected");
+        const r = timeOptCard.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+        const customContainer = document.getElementById("log-modal-custom-time-container");
+        if (customContainer) {
+          if (r?.value === "custom") {
+            customContainer.classList.remove("hidden");
+            const customInput = document.getElementById("log-modal-custom-datetime");
+            if (customInput && !customInput.value) {
+              const nowObj = new Date();
+              const tzOffset = nowObj.getTimezoneOffset() * 60000;
+              customInput.value = new Date(nowObj.getTime() - tzOffset).toISOString().slice(0, 16);
+            }
+          } else {
+            customContainer.classList.add("hidden");
+          }
+        }
+        return;
+      }
+
+      // Manual modal time option cards on Tracker Page
+      const manualNowCard = event.target.closest("#manual-time-opt-now");
+      if (manualNowCard) {
+        manualNowCard.classList.add("is-selected");
+        document.getElementById("manual-time-opt-custom")?.classList.remove("is-selected");
+        const r = manualNowCard.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+        document.getElementById("manual-custom-time-container")?.classList.add("hidden");
+        return;
+      }
+      const manualCustomCard = event.target.closest("#manual-time-opt-custom");
+      if (manualCustomCard) {
+        manualCustomCard.classList.add("is-selected");
+        document.getElementById("manual-time-opt-now")?.classList.remove("is-selected");
+        const r = manualCustomCard.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+        const container = document.getElementById("manual-custom-time-container");
+        if (container) {
+          container.classList.remove("hidden");
+          const input = document.getElementById("manual-tracker-consumed-at");
+          if (input && !input.value) {
+            const nowObj = new Date();
+            const tzOffset = nowObj.getTimezoneOffset() * 60000;
+            input.value = new Date(nowObj.getTime() - tzOffset).toISOString().slice(0, 16);
+          }
+        }
+        return;
+      }
+
+      // Upgrade: Pop-up Modal when User Clicks "Log to Tracker"
+      const logToTrackerBtn = event.target.closest("[data-log-to-tracker-btn]");
+      if (logToTrackerBtn && !logToTrackerBtn.disabled) {
+        const messageId = logToTrackerBtn.dataset.messageId || "";
+        const conversationId = logToTrackerBtn.dataset.conversationId
+          || document.querySelector("main[data-conversation-id]")?.dataset.conversationId
+          || "";
+        const mealTitle = logToTrackerBtn.dataset.mealTitle || "Analyzed Meal";
+        let analysisPayload = null;
+        const turnContainer = logToTrackerBtn.closest(".nutrition-report, .assistant-turn");
+        const analysisScript = turnContainer?.querySelector("[data-turn-analysis-json]");
+        if (analysisScript && analysisScript.textContent.trim()) {
+          try {
+            analysisPayload = JSON.parse(analysisScript.textContent);
+          } catch (_) {
+            analysisPayload = null;
+          }
+        }
+
+        // Store reference to active button and analysis
+        window.activeLogTurnBtn = logToTrackerBtn;
+        window.activeLogAnalysis = analysisPayload;
+
+        // Populate modal fields
+        const modalMealName = document.getElementById("log-modal-meal-name");
+        if (modalMealName) modalMealName.textContent = mealTitle;
+
+        const modalMsgInput = document.getElementById("log-modal-message-id");
+        if (modalMsgInput) modalMsgInput.value = messageId;
+
+        const modalConvInput = document.getElementById("log-modal-conversation-id");
+        if (modalConvInput) modalConvInput.value = conversationId;
+
+        // Macros summary chips
+        const macros = (analysisPayload?.total_macronutrients || analysisPayload?.macronutrients) || {};
+        const calEl = document.getElementById("log-modal-calories-chip");
+        if (calEl) calEl.textContent = Math.round(macros.calories_kcal || 0) + " kcal";
+        const protEl = document.getElementById("log-modal-protein-chip");
+        if (protEl) protEl.textContent = Number(macros.protein_g || 0).toFixed(1) + "g Protein";
+        const carbsEl = document.getElementById("log-modal-carbs-chip");
+        if (carbsEl) carbsEl.textContent = Number(macros.carbohydrates_g || 0).toFixed(1) + "g Carbs";
+        const fatEl = document.getElementById("log-modal-fat-chip");
+        if (fatEl) fatEl.textContent = Number(macros.total_fat_g || 0).toFixed(1) + "g Fat";
+
+        // Reset Time Options to "Right Now"
+        const nowCard = document.getElementById("time-opt-now-card");
+        const customCard = document.getElementById("time-opt-custom-card");
+        const nowRadio = document.querySelector('input[name="modal_time_option"][value="now"]');
+        const customTimeContainer = document.getElementById("log-modal-custom-time-container");
+        const customDateTimeInput = document.getElementById("log-modal-custom-datetime");
+
+        if (nowRadio) nowRadio.checked = true;
+        if (nowCard) nowCard.classList.add("is-selected");
+        if (customCard) customCard.classList.remove("is-selected");
+        if (customTimeContainer) customTimeContainer.classList.add("hidden");
+
+        const nowObj = new Date();
+        const nowLabel = document.getElementById("log-modal-now-time-label");
+        if (nowLabel) {
+          nowLabel.textContent = "Current time (" + nowObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ")";
+        }
+        if (customDateTimeInput) {
+          const tzOffset = nowObj.getTimezoneOffset() * 60000;
+          customDateTimeInput.value = new Date(nowObj.getTime() - tzOffset).toISOString().slice(0, 16);
+        }
+
+        // Infer category based on current hour
+        const hr = nowObj.getHours();
+        let inferredCategory = "Lunch";
+        if (hr >= 5 && hr < 11) inferredCategory = "Breakfast";
+        else if (hr >= 11 && hr < 15) inferredCategory = "Lunch";
+        else if (hr >= 15 && hr < 18) inferredCategory = "Snacks";
+        else if (hr >= 18 || hr < 5) inferredCategory = "Dinner";
+
+        document.querySelectorAll('input[name="modal_meal_type"]').forEach(r => {
+          const card = r.closest("[data-modal-category-card]");
+          if (r.value.toLowerCase() === inferredCategory.toLowerCase()) {
+            r.checked = true;
+            if (card) card.classList.add("is-selected");
+          } else {
+            r.checked = false;
+            if (card) card.classList.remove("is-selected");
+          }
+        });
+
+        const feedbackEl = document.getElementById("log-modal-feedback");
+        if (feedbackEl) {
+          feedbackEl.className = "hidden";
+          feedbackEl.textContent = "";
+        }
+
+        openModal("log-to-tracker-modal");
+        return;
+      }
+
+      // Upgrade 4: Delete Individual Chat Message
+      const deleteMsgBtn = event.target.closest("[data-delete-message-btn]");
+      if (deleteMsgBtn) {
+        const messageId = deleteMsgBtn.dataset.messageId;
+        const conversationId = deleteMsgBtn.dataset.conversationId
+          || document.querySelector("main[data-conversation-id]")?.dataset.conversationId
+          || "";
+        if (!messageId || !conversationId) return;
+        deleteMsgBtn.disabled = true;
+        try {
+          const resp = await fetch(`/chats/${conversationId}/messages/${messageId}/delete`, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not delete chat message.");
+          const turnWrapper = deleteMsgBtn.closest("[data-chat-turn-id]");
+          if (turnWrapper) {
+            turnWrapper.remove();
+          } else {
+            const assistantTurn = deleteMsgBtn.closest(".assistant-turn");
+            const prevUserTurn = assistantTurn?.previousElementSibling;
+            if (prevUserTurn && prevUserTurn.classList.contains("user-turn")) {
+              prevUserTurn.remove();
+            }
+            assistantTurn?.remove();
+          }
+        } catch (err) {
+          deleteMsgBtn.disabled = false;
+          alert(err.message || "Could not delete message.");
+        }
+        return;
+      }
+
+      // Upgrade 4: Delete Entire Chat Conversation from Sidebar
+      const deleteChatBtn = event.target.closest("[data-delete-chat-id]");
+      if (deleteChatBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const chatId = deleteChatBtn.dataset.deleteChatId;
+        deleteChatBtn.disabled = true;
+        try {
+          const resp = await fetch(`/chats/${chatId}/delete`, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not delete conversation.");
+          const row = deleteChatBtn.closest("[data-chat-history-row]");
+          row?.remove();
+          if (window.location.pathname === `/chats/${chatId}`) {
+            window.location.href = "/";
+          }
+        } catch (err) {
+          deleteChatBtn.disabled = false;
+        }
+        return;
+      }
+
+      // Upgrade 4: Delete Saved Meal Plan from History Sidebar
+      const deleteMpBtn = event.target.closest("[data-delete-meal-plan-id]");
+      if (deleteMpBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const planId = deleteMpBtn.dataset.deleteMealPlanId;
+        deleteMpBtn.disabled = true;
+        try {
+          const resp = await fetch(`/meal-plans/${planId}/delete`, {
+            method: "POST",
+            headers: { Accept: "application/json" },
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not delete meal plan.");
+          mealPlanHistory = mealPlanHistory.filter((item) => String(item.id) !== String(planId));
+          renderMealPlanHistory();
+        } catch (err) {
+          deleteMpBtn.disabled = false;
+          setMealPlanError(err.message || "Could not delete meal plan.");
+        }
+        return;
+      }
+
+      // Upgrade 3: Generate Strong Password & Show/Hide Toggle
+      if (event.target.closest("#generate-strong-password-btn")) {
+        const pwInput = document.getElementById("signup-password");
+        if (pwInput) {
+          const strongPw = generateStrongPassword();
+          pwInput.value = strongPw;
+          pwInput.type = "text";
+          const toggleBtn = document.getElementById("toggle-signup-password-btn");
+          if (toggleBtn) toggleBtn.textContent = "Hide";
+          updatePasswordStrengthUI(strongPw);
+        }
+        return;
+      }
+      if (event.target.closest("#toggle-signup-password-btn")) {
+        const pwInput = document.getElementById("signup-password");
+        const toggleBtn = document.getElementById("toggle-signup-password-btn");
+        if (pwInput && toggleBtn) {
+          const isHidden = pwInput.type === "password";
+          pwInput.type = isHidden ? "text" : "password";
+          toggleBtn.textContent = isHidden ? "Hide" : "Show";
+        }
+        return;
+      }
+
+      // Upgrade 2: Remove Profile Picture Button
+      if (event.target.closest("#profile-remove-avatar-btn")) {
+        const hiddenInput = document.getElementById("profile-picture-data");
+        if (hiddenInput) hiddenInput.value = "";
+        const fileInput = document.getElementById("profile-avatar-file");
+        if (fileInput) fileInput.value = "";
+        const previewBox = document.getElementById("profile-avatar-preview") || document.getElementById("profile-avatar-preview-box");
+        const nameVal = document.getElementById("profile-name")?.value || "U";
+        if (previewBox) previewBox.textContent = (nameVal[0] || "U").toUpperCase();
+        event.target.closest("#profile-remove-avatar-btn").classList.add("hidden");
+        return;
+      }
+
+      // Meal Plan Preference Pills
+      const preference = event.target.closest(".meal-preference");
+      if (preference) {
+        const selected = preference.getAttribute("aria-pressed") !== "true";
+        preference.setAttribute("aria-pressed", String(selected));
+      }
+
+      // Meal Plan Duration Radio Tabs
+      const durationTab = event.target.closest("[data-duration-tab]");
+      if (durationTab) {
+        const radio = durationTab.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        document.querySelectorAll("[data-duration-tab]").forEach((el) => el.classList.remove("is-selected"));
+        durationTab.classList.add("is-selected");
+        syncMealPlanModeUI(false);
+      }
+
+      // Meal Plan Diet Type Radio Cards
+      const dietTab = event.target.closest("[data-diet-tab]");
+      if (dietTab) {
+        const radio = dietTab.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        document.querySelectorAll("[data-diet-tab]").forEach((el) => el.classList.remove("is-selected"));
+        dietTab.classList.add("is-selected");
+        syncMealPlanModeUI(false);
+      }
+
+      // Meal Plan Multimodal Buttons
+      if (event.target.closest("#meal-plan-attach-btn")) {
+        document.getElementById("meal-plan-image")?.click();
+      }
+      if (event.target.closest("#meal-plan-audio-upload-btn")) {
+        document.getElementById("meal-plan-voice")?.click();
+      }
+      if (event.target.closest("#meal-plan-mic-btn")) {
+        await toggleMealPlanRecording();
+      }
+
+      // Meal Plan History Item
+      const historyItem = event.target.closest("[data-meal-plan-id]");
+      if (historyItem) {
+        const record = mealPlanHistory.find((item) => item.id === historyItem.dataset.mealPlanId);
+        if (record) {
+          document.querySelectorAll(".meal-plan-history-item").forEach((item) => item.setAttribute("aria-current", "false"));
+          historyItem.setAttribute("aria-current", "true");
+          renderMealPlan(record);
+        }
+      }
+
+      // Auth Tab Switching
+      const authTabBtn = event.target.closest("[data-auth-tab]");
+      const switchAuthBtn = event.target.closest("[data-switch-auth]");
+      const targetAuthMode = authTabBtn?.dataset.authTab || switchAuthBtn?.dataset.switchAuth;
+      if (targetAuthMode) {
+        document.querySelectorAll("[data-auth-tab]").forEach((btn) => {
+          const active = btn.dataset.authTab === targetAuthMode;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-selected", String(active));
+        });
+        document.querySelectorAll("[data-auth-panel]").forEach((panel) => {
+          panel.classList.toggle("hidden", panel.dataset.authPanel !== targetAuthMode);
+        });
+        showFeedback("auth-feedback", "");
+      }
+
+      // Logout Button
+      if (event.target.closest("#header-logout-btn")) {
+        await fetch("/auth/logout", { method: "POST" });
+        window.location.href = "/login";
+      }
+
+      // Profile Quick-Add Allergen Chip
+      const allergenChip = event.target.closest(".allergy-quick-chip");
+      if (allergenChip) {
+        const input = document.getElementById("profile-allergies");
+        if (input) {
+          const val = allergenChip.dataset.allergen;
+          const existing = input.value.split(",").map((s) => s.trim()).filter(Boolean);
+          if (!existing.some((item) => item.toLowerCase() === val.toLowerCase())) {
+            existing.push(val);
+            input.value = existing.join(", ");
+          }
+        }
+      }
+
+      // Group Visibility Radio Cards
+      const visCard = event.target.closest("[data-visibility-card]");
+      if (visCard) {
+        const radio = visCard.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        document.querySelectorAll("[data-visibility-card]").forEach((el) => el.classList.remove("is-selected"));
+        visCard.classList.add("is-selected");
+        const hint = document.getElementById("group-name-hint");
+        if (hint && radio) {
+          hint.textContent = radio.value === "public"
+            ? "Public group names must be unique across NutriGuide."
+            : "Private group — only members you invite can view or join.";
+        }
+      }
+
+      // Open Group Detail Modal Button
+      const openGroupBtn = event.target.closest("[data-open-group-id]");
+      if (openGroupBtn) {
+        await openGroupDetail(openGroupBtn.dataset.openGroupId);
+      }
+
+      // Join Public Group Button
+      const joinGroupBtn = event.target.closest("[data-join-group-id]");
+      if (joinGroupBtn) {
+        const gid = joinGroupBtn.dataset.joinGroupId;
+        try {
+          const resp = await fetch(`/groups/${gid}/join`, { method: "POST", headers: { Accept: "application/json" } });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not join group.");
+          renderGroupDashboard(data);
+          await loadGroupsDirectory();
+        } catch (err) {
+          showFeedback("group-page-feedback", err.message, true);
+        }
+      }
+    });
+
+    // File & Radio Change Listeners (Meal Plan + Profile Avatar Upload)
+    document.body.addEventListener("change", (event) => {
+      if (event.target.id === "profile-avatar-file") {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const previewUrl = URL.createObjectURL(file);
+        const previewBox = document.getElementById("profile-avatar-preview") || document.getElementById("profile-avatar-preview-box");
+        if (previewBox) {
+          previewBox.innerHTML = `<img id="profile-avatar-preview-img" src="${previewUrl}" alt="Profile picture preview" class="h-full w-full rounded-[14px_14px_14px_4px] object-cover">`;
+        }
+        document.getElementById("profile-remove-avatar-btn")?.classList.remove("hidden");
+      }
+
+      if (event.target.name === "duration") {
+        document.querySelectorAll("[data-duration-tab]").forEach((el) => {
+          const r = el.querySelector('input[type="radio"]');
+          el.classList.toggle("is-selected", Boolean(r && r.checked));
+        });
+        syncMealPlanModeUI(false);
+      }
+      if (event.target.name === "diet_type") {
+        document.querySelectorAll("[data-diet-tab]").forEach((el) => {
+          const r = el.querySelector('input[type="radio"]');
+          el.classList.toggle("is-selected", Boolean(r && r.checked));
+        });
+        syncMealPlanModeUI(false);
+      }
+      if (event.target.id === "meal-plan-image") {
+        if (mpRecording.imageUrl) {
+          URL.revokeObjectURL(mpRecording.imageUrl);
+          mpRecording.imageUrl = null;
+        }
+        updateMealPlanAttachmentChips();
+      }
+      if (event.target.id === "meal-plan-voice") {
+        updateMealPlanAttachmentChips();
+      }
+    });
+
+    // Form Submissions (Meal Plan, Login, Signup, Profile, Groups, Manual Tracker)
+    document.body.addEventListener("submit", async (event) => {
+      // 1. Meal Plan Form
+      const mpForm = event.target.closest("#meal-plan-form");
+      if (mpForm) {
+        event.preventDefault();
+        if (mpRecording.recorder) {
+          setMealPlanError("Please stop the voice recording first so it can be attached.");
+          return;
+        }
+        const preferences = Array.from(mpForm.querySelectorAll('.meal-preference[aria-pressed="true"]')).map((btn) => btn.dataset.preference);
+        const customRequest = mpForm.elements.custom_request.value.trim();
+        const duration = mpForm.querySelector('input[name="duration"]:checked')?.value
+          || mpForm.querySelector('[data-duration-tab].is-selected input[name="duration"]')?.value
+          || "daily";
+        const dietType = mpForm.querySelector('input[name="diet_type"]:checked')?.value
+          || mpForm.querySelector('[data-diet-tab].is-selected input[name="diet_type"]')?.value
+          || "veg";
+        const imgFile = document.getElementById("meal-plan-image")?.files?.[0];
+        const voiceFile = document.getElementById("meal-plan-voice")?.files?.[0];
+        const durLabel = DURATION_LABELS[duration] || `${duration} Plan`;
+        const dietLabel = DIET_LABELS[dietType] || dietType;
+
+        const submit = document.getElementById("generate-meal-plan");
+        submit.disabled = true;
+        submit.innerHTML = `<span>Generating ${duration} meal plan…</span>`;
+        setMealPlanError("");
+        syncMealPlanModeUI(true);
+
+        const result = document.getElementById("meal-plan-result");
+        result.classList.remove("hidden");
+        const metaBadges = document.getElementById("meal-plan-meta-badges");
+        if (metaBadges) {
+          metaBadges.replaceChildren();
+          const bDur = document.createElement("span");
+          bDur.className = "badge-pill badge-green";
+          bDur.textContent = `Generating ${durLabel}…`;
+          const bDiet = document.createElement("span");
+          bDiet.className = dietType === "non-veg" ? "badge-pill badge-coral" : (dietType === "egg" ? "badge-pill badge-amber" : "badge-pill badge-blue");
+          bDiet.textContent = dietLabel;
+          metaBadges.append(bDur, bDiet);
+        }
+        document.getElementById("meal-plan-summary").textContent = `Crafting your ${durLabel} (${dietLabel})…`;
+        document.getElementById("meal-plan-sections").replaceChildren();
+
+        try {
+          let response;
+          if (imgFile || voiceFile) {
+            const fd = new FormData();
+            fd.append("owner_id", mpForm.elements.owner_id.value);
+            fd.append("duration", duration);
+            fd.append("diet_type", dietType);
+            fd.append("custom_request", customRequest);
+            fd.append("preferences", JSON.stringify(preferences));
+            if (imgFile) fd.append("image", imgFile);
+            if (voiceFile) fd.append("voice", voiceFile);
+            response = await fetch("/meal-plans/generate", { method: "POST", body: fd });
+          } else {
+            response = await fetch("/meal-plans/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                preferences,
+                custom_request: customRequest,
+                duration,
+                diet_type: dietType,
+                owner_id: mpForm.elements.owner_id.value,
+              }),
+            });
+          }
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.detail || "Meal plan generation failed. Please try again.");
+          renderMealPlan(payload);
+          await loadMealPlanHistory();
+        } catch (error) {
+          result.classList.add("hidden");
+          setMealPlanError(error.message || "Meal plan generation failed. Please try again.");
+        } finally {
+          submit.disabled = false;
+          submit.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span id="generate-meal-plan-label">Create ${duration} meal plan</span><span aria-hidden="true">→</span>`;
+          syncMealPlanModeUI(false);
+        }
+        return;
+      }
+
+      // 2. Login Form
+      const loginForm = event.target.closest("#login-form");
+      if (loginForm) {
+        event.preventDefault();
+        const btn = document.getElementById("login-submit-btn");
+        btn.disabled = true;
+        showFeedback("auth-feedback", "");
+        try {
+          const resp = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              username: loginForm.elements.username.value.trim(),
+              password: loginForm.elements.password.value,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Login failed.");
+          showFeedback("auth-feedback", "Signed in! Redirecting to your profile…", false);
+          window.location.href = "/profile";
+        } catch (err) {
+          showFeedback("auth-feedback", err.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      // 3. Signup Form (with Strong Password Validation)
+      const signupForm = event.target.closest("#signup-form");
+      if (signupForm) {
+        event.preventDefault();
+        const pwValue = signupForm.elements.password.value;
+        const pwCheck = evaluatePasswordStrength(pwValue);
+        if (!pwCheck.isStrong) {
+          updatePasswordStrengthUI(pwValue);
+          showFeedback(
+            "auth-feedback",
+            "Please meet all 5 strong password requirements (8+ chars, uppercase, lowercase, number, and special character) or click 'Suggest Strong Password'.",
+            true
+          );
+          return;
+        }
+
+        const btn = document.getElementById("signup-submit-btn");
+        btn.disabled = true;
+        showFeedback("auth-feedback", "");
+        try {
+          const resp = await fetch("/auth/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              username: signupForm.elements.username.value.trim(),
+              email: signupForm.elements.email.value.trim(),
+              password: pwValue,
+              owner_id: signupForm.elements.owner_id.value,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Account creation failed.");
+          showFeedback("auth-feedback", "Account created! Redirecting to complete your profile…", false);
+          window.location.href = "/profile";
+        } catch (err) {
+          showFeedback("auth-feedback", err.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      // 4. User Profile Form (with Multipart Profile Picture Upload to MEDIA_ROOT)
+      const profileForm = event.target.closest("#profile-form");
+      if (profileForm) {
+        event.preventDefault();
+        const btn = document.getElementById("profile-save-btn");
+        btn.disabled = true;
+        showFeedback("profile-feedback", "");
+        const pictureData = document.getElementById("profile-picture-data")?.value ?? "";
+        const avatarFile = document.getElementById("profile-avatar-file")?.files?.[0];
+        try {
+          let resp;
+          if (avatarFile) {
+            const fd = new FormData();
+            fd.append("name", profileForm.elements.name.value.trim());
+            fd.append("gender", profileForm.elements.gender.value);
+            fd.append("age", profileForm.elements.age.value);
+            fd.append("height_cm", profileForm.elements.height_cm.value);
+            fd.append("weight_kg", profileForm.elements.weight_kg.value);
+            fd.append("allergies", profileForm.elements.allergies.value.trim());
+            fd.append("bio", profileForm.elements.bio.value.trim());
+            fd.append("owner_id", profileForm.elements.owner_id.value);
+            fd.append("profile_picture_file", avatarFile);
+            resp = await fetch("/profile/update", {
+              method: "POST",
+              headers: { Accept: "application/json" },
+              body: fd,
+            });
+          } else {
+            resp = await fetch("/profile/update", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({
+                name: profileForm.elements.name.value.trim(),
+                gender: profileForm.elements.gender.value,
+                age: profileForm.elements.age.value,
+                height_cm: profileForm.elements.height_cm.value,
+                weight_kg: profileForm.elements.weight_kg.value,
+                allergies: profileForm.elements.allergies.value.trim(),
+                bio: profileForm.elements.bio.value.trim(),
+                profile_picture: pictureData,
+                owner_id: profileForm.elements.owner_id.value,
+              }),
+            });
+          }
+          const p = await resp.json();
+          if (!resp.ok) throw new Error(p.detail || "Could not save profile.");
+          showFeedback("profile-feedback", "Your nutrition profile and display picture have been saved.", false);
+
+          const hiddenInput = document.getElementById("profile-picture-data");
+          if (hiddenInput) hiddenInput.value = p.profile_picture || "";
+          const fileInput = document.getElementById("profile-avatar-file");
+          if (fileInput) fileInput.value = "";
+
+          document.getElementById("summary-name").textContent = p.name || p.username || "Your Profile";
+          const summaryAvatar = document.getElementById("summary-avatar");
+          const topbarAvatar = document.getElementById("topbar-user-avatar");
+          const previewAvatar = document.getElementById("profile-avatar-preview");
+          if (p.profile_picture) {
+            const cacheBustedUrl = `${p.profile_picture}${p.profile_picture.includes("?") ? "&" : "?"}t=${Date.now()}`;
+            if (summaryAvatar) {
+              summaryAvatar.innerHTML = `<img src="${cacheBustedUrl}" alt="Profile display picture" class="h-full w-full rounded-[14px_14px_14px_4px] object-cover">`;
+            }
+            if (previewAvatar) {
+              previewAvatar.innerHTML = `<img id="profile-avatar-preview-img" src="${cacheBustedUrl}" alt="Profile picture preview" class="h-full w-full rounded-[14px_14px_14px_4px] object-cover">`;
+            }
+            if (topbarAvatar) {
+              topbarAvatar.innerHTML = `<img src="${cacheBustedUrl}" alt="${p.username}" class="h-full w-full rounded-full object-cover">`;
+            }
+          } else {
+            const initial = (p.name || p.username || "N")[0].toUpperCase();
+            if (summaryAvatar) summaryAvatar.textContent = initial;
+            if (previewAvatar) previewAvatar.textContent = initial;
+            if (topbarAvatar) topbarAvatar.textContent = initial;
+          }
+
+          document.getElementById("summary-age-gender").textContent =
+            (p.age || p.gender) ? `${p.age ? p.age + " yrs" : "—"}${p.gender ? " · " + p.gender : ""}` : "Not set";
+          document.getElementById("summary-height-weight").textContent =
+            (p.height_cm || p.weight_kg) ? `${p.height_cm ? p.height_cm + " cm" : "—"} / ${p.weight_kg ? p.weight_kg + " kg" : "—"}` : "Not set";
+          document.getElementById("summary-bmi-value").textContent = p.bmi || "—";
+          document.getElementById("summary-bmi-badge").textContent = p.bmi_category || "Enter height & weight";
+          document.getElementById("summary-bio").textContent = p.bio || "Add a short bio about your food preferences, lifestyle, or health goals.";
+          const algContainer = document.getElementById("summary-allergies");
+          algContainer.replaceChildren();
+          if (p.allergies_list?.length) {
+            for (const item of p.allergies_list) {
+              const s = document.createElement("span");
+              s.className = "badge-pill badge-coral";
+              s.textContent = item;
+              algContainer.append(s);
+            }
+          } else {
+            const s = document.createElement("span");
+            s.className = "text-xs text-[#89938c]";
+            s.textContent = "No allergies listed";
+            algContainer.append(s);
+          }
+        } catch (err) {
+          showFeedback("profile-feedback", err.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      // 5. Create Group Form (inside Modal)
+      const createGroupForm = event.target.closest("#create-group-form");
+      if (createGroupForm) {
+        event.preventDefault();
+        const btn = document.getElementById("create-group-btn");
+        btn.disabled = true;
+        showFeedback("group-create-feedback", "");
+        const visibility = createGroupForm.querySelector('input[name="visibility"]:checked')?.value || "public";
+        const rawMembers = createGroupForm.elements.member_identifiers.value
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        try {
+          const resp = await fetch("/groups/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              name: createGroupForm.elements.name.value.trim(),
+              description: createGroupForm.elements.description.value.trim(),
+              visibility,
+              is_public: visibility === "public",
+              member_identifiers: rawMembers,
+              owner_id: createGroupForm.elements.owner_id.value,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not create group.");
+          createGroupForm.reset();
+          closeModal("create-group-modal");
+          showFeedback("group-page-feedback", `Group "${data.name}" created!`, false);
+          await loadGroupsDirectory();
+          renderGroupDashboard(data);
+        } catch (err) {
+          showFeedback("group-create-feedback", err.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+        return;
+      }
+
+      // 6. Add Member to Group Form
+      const addMemberForm = event.target.closest("#add-group-member-form");
+      if (addMemberForm) {
+        event.preventDefault();
+        const gid = document.getElementById("active-group-id")?.value;
+        const ident = document.getElementById("add-member-identifier")?.value.trim();
+        if (!gid || !ident) return;
+        showFeedback("group-dashboard-feedback", "");
+        try {
+          const resp = await fetch(`/groups/${gid}/members`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ identifier: ident }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not add member.");
+          document.getElementById("add-member-identifier").value = "";
+          showFeedback("group-dashboard-feedback", `Added member(s): ${(data.added_members || [ident]).join(", ")}`, false);
+          renderGroupDashboard(data);
+          await loadGroupsDirectory();
+        } catch (err) {
+          showFeedback("group-dashboard-feedback", err.message, true);
+        }
+        return;
+      }
+
+      // 7. Log Meal to Group Form
+      const logMealForm = event.target.closest("#log-group-meal-form");
+      if (logMealForm) {
+        event.preventDefault();
+        const gid = document.getElementById("active-group-id")?.value;
+        if (!gid) return;
+        showFeedback("group-dashboard-feedback", "");
+        try {
+          const resp = await fetch(`/groups/${gid}/meals`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              meal_title: logMealForm.elements.meal_title.value.trim(),
+              meal_type: logMealForm.elements.meal_type.value,
+              calories_kcal: logMealForm.elements.calories_kcal.value ? parseFloat(logMealForm.elements.calories_kcal.value) : null,
+              protein_g: logMealForm.elements.protein_g.value ? parseFloat(logMealForm.elements.protein_g.value) : null,
+              carbohydrates_g: logMealForm.elements.carbohydrates_g.value ? parseFloat(logMealForm.elements.carbohydrates_g.value) : null,
+              total_fat_g: logMealForm.elements.total_fat_g.value ? parseFloat(logMealForm.elements.total_fat_g.value) : null,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not log meal.");
+          logMealForm.reset();
+          showFeedback("group-dashboard-feedback", "Meal logged to group collective nutrition!", false);
+          renderGroupDashboard(data);
+          await loadGroupsDirectory();
+        } catch (err) {
+          showFeedback("group-dashboard-feedback", err.message, true);
+        }
+        return;
+      }
+
+      // 8. Manual Tracker Log Form
+      const manualTrackerForm = event.target.closest("#manual-tracker-log-form");
+      if (manualTrackerForm) {
+        event.preventDefault();
+        const btn = document.getElementById("manual-tracker-submit-btn");
+        if (btn) btn.disabled = true;
+
+        const timeOptRadio = manualTrackerForm.querySelector('input[name="manual_time_option"]:checked');
+        const manualTimeOption = timeOptRadio ? timeOptRadio.value : "now";
+        let manualConsumedAt = null;
+        if (manualTimeOption === "custom") {
+          const dtInput = document.getElementById("manual-tracker-consumed-at");
+          if (dtInput && dtInput.value) manualConsumedAt = dtInput.value;
+        }
+
+        try {
+          const resp = await fetch("/tracker/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              owner_id: manualTrackerForm.elements.owner_id.value,
+              meal_title: manualTrackerForm.elements.meal_title.value.trim(),
+              meal_type: manualTrackerForm.elements.meal_type.value,
+              calories_kcal: parseFloat(manualTrackerForm.elements.calories_kcal.value || "0"),
+              protein_g: parseFloat(manualTrackerForm.elements.protein_g.value || "0"),
+              carbohydrates_g: parseFloat(manualTrackerForm.elements.carbohydrates_g.value || "0"),
+              total_fat_g: parseFloat(manualTrackerForm.elements.total_fat_g.value || "0"),
+              dietary_fiber_g: parseFloat(manualTrackerForm.elements.dietary_fiber_g.value || "0"),
+              total_sugars_g: parseFloat(manualTrackerForm.elements.total_sugars_g.value || "0"),
+              time_option: manualTimeOption,
+              consumed_at: manualConsumedAt,
+              logged_via: "manual",
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not log meal to tracker.");
+          manualTrackerForm.reset();
+          closeModal("manual-tracker-modal");
+          await loadTrackerData();
+          showFeedback("tracker-feedback", "Meal logged to your personal nutrition tracker!", false);
+        } catch (err) {
+          showFeedback("tracker-feedback", err.message, true);
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+        return;
+      }
+
+      // 9. Pop-up Modal: Log Food to Tracker Form with Time Picker
+      const logModalForm = event.target.closest("#log-to-tracker-form");
+      if (logModalForm) {
+        event.preventDefault();
+        const submitBtn = document.getElementById("log-modal-submit-btn");
+        if (submitBtn) submitBtn.disabled = true;
+        const feedbackEl = document.getElementById("log-modal-feedback");
+        if (feedbackEl) {
+          feedbackEl.className = "hidden";
+          feedbackEl.textContent = "";
+        }
+
+        const messageId = document.getElementById("log-modal-message-id")?.value || "";
+        const conversationId = document.getElementById("log-modal-conversation-id")?.value || "";
+        const ownerId = document.querySelector('input[name="owner_id"]')?.value || "";
+        const mealTitle = document.getElementById("log-modal-meal-name")?.textContent || "Logged Meal";
+
+        const selectedTypeRadio = logModalForm.querySelector('input[name="modal_meal_type"]:checked');
+        const mealType = selectedTypeRadio ? selectedTypeRadio.value : "Meal";
+
+        const selectedTimeOptRadio = logModalForm.querySelector('input[name="modal_time_option"]:checked');
+        const timeOption = selectedTimeOptRadio ? selectedTimeOptRadio.value : "now";
+
+        let consumedAt = null;
+        if (timeOption === "custom") {
+          const customInput = document.getElementById("log-modal-custom-datetime");
+          if (customInput && customInput.value) {
+            consumedAt = customInput.value;
+          }
+        }
+
+        try {
+          const requestBody = JSON.stringify({
+            owner_id: ownerId,
+            conversation_id: conversationId,
+            message_id: messageId,
+            meal_title: mealTitle,
+            meal_type: mealType,
+            analysis: window.activeLogAnalysis || null,
+            time_option: timeOption,
+            consumed_at: consumedAt,
+            logged_via: "chat_button",
+          });
+
+          let resp = await fetch("/tracker/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: requestBody,
+          });
+          if (resp.status === 404 && API_BASE_URL) {
+            resp = await fetch(`${API_BASE_URL}/api/tracker/log`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: requestBody,
+            });
+          }
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Could not log meal to tracker.");
+
+          closeModal("log-to-tracker-modal");
+
+          // Update the button in the chat turn
+          if (window.activeLogTurnBtn) {
+            window.activeLogTurnBtn.classList.remove("turn-action-log");
+            window.activeLogTurnBtn.classList.add("turn-action-logged");
+            window.activeLogTurnBtn.disabled = true;
+            window.activeLogTurnBtn.innerHTML = `
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Logged to Tracker ✓</span>
+            `;
+          }
+
+          // If on Tracker page, refresh data
+          if (document.querySelector('[data-page="tracker"]')) {
+            await loadTrackerData();
+            showFeedback("tracker-feedback", "Meal successfully logged to your tracker!", false);
+          }
+        } catch (err) {
+          if (feedbackEl) {
+            feedbackEl.className = "rounded-lg p-2.5 text-xs font-medium bg-[#fdf0ec] text-[#b8422b] border border-[#f3d2c8]";
+            feedbackEl.textContent = err.message || "Could not log meal to tracker.";
+          } else {
+            alert(err.message || "Could not log meal to tracker.");
+          }
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+        return;
+      }
+    });
+
+    document.body.addEventListener("htmx:afterSwap", (event) => {
+      if (event.detail.target.id !== "chat-view") return;
+      const currentPath = window.location.pathname;
+      const conversation = document.getElementById("conversation");
+      if (conversation) conversation.scrollTop = conversation.scrollHeight;
+      const conversationId = event.detail.target.querySelector("main[data-conversation-id]")?.dataset.conversationId;
+      const form = document.getElementById("chat-form");
+      if (currentPath === "/" && form) {
+        form.reset();
+        const imageInput = document.getElementById("meal-image");
+        if (imageInput) imageInput.dispatchEvent(new Event("change", { bubbles: true }));
+        const composerError = document.getElementById("composer-error");
+        if (composerError) composerError.classList.add("hidden");
+      }
+      const conversationInput = document.querySelector('#chat-form input[name="conversation_id"]');
+      if (conversationId && conversationInput) conversationInput.value = conversationId;
+      document.querySelectorAll(".chat-history-link").forEach((link) => {
+        if (link.getAttribute("href") === currentPath) link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
+      });
+      document.querySelectorAll("[data-sidebar-link]").forEach((link) => {
+        if (link.getAttribute("href") === currentPath) link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
+      });
+      const sidebar = document.getElementById("chat-sidebar");
+      if (sidebar && window.matchMedia("(max-width: 720px)").matches) sidebar.classList.remove("is-open");
+      const toggle = document.getElementById("sidebar-toggle");
+      if (toggle && window.matchMedia("(max-width: 720px)").matches) toggle.setAttribute("aria-expanded", "false");
+
+      if (document.querySelector('[data-page="tracker"]')) {
+        document.title = "NutriGuide | Nutrition Tracker";
+        initTrackerFromDOM();
+        loadTrackerData();
+      } else if (document.querySelector('[data-page="meal-plan"]')) {
+        document.title = "NutriGuide | Meal plans";
+        syncMealPlanModeUI(false);
+        loadMealPlanHistory();
+      } else if (document.querySelector('[data-page="groups"]')) {
+        document.title = "NutriGuide | Nutrition Groups";
+        loadGroupsDirectory();
+      } else if (document.querySelector('[data-page="profile"]')) {
+        document.title = "NutriGuide | User Profile";
+      } else if (document.querySelector('[data-page="auth"]')) {
+        document.title = "NutriGuide | Account";
+      } else {
+        document.title = "NutriGuide | Meal analysis";
+      }
+
+      // Reverse lookup: Jump and pulse highlight target chat turn if hash anchor is present
+      if (window.location.hash) {
+        const rawHash = window.location.hash;
+        const cleanId = rawHash.replace(/^#/, "");
+        const targetTurn = document.getElementById(cleanId)
+          || document.getElementById(`turn-${cleanId}`)
+          || document.querySelector(`[data-message-id="${cleanId.replace('turn-', '')}"]`);
+        if (targetTurn) {
+          setTimeout(() => {
+            targetTurn.scrollIntoView({ behavior: "smooth", block: "center" });
+            targetTurn.classList.add("turn-highlight-pulse");
+            setTimeout(() => targetTurn.classList.remove("turn-highlight-pulse"), 2500);
+          }, 120);
+        }
+      }
+    });
+
+    function checkTurnHashAnchor() {
+      if (!window.location.hash) return;
+      const cleanId = window.location.hash.replace(/^#/, "");
+      const targetTurn = document.getElementById(cleanId)
+        || document.getElementById(`turn-${cleanId}`)
+        || document.querySelector(`[data-message-id="${cleanId.replace('turn-', '')}"]`);
+      if (targetTurn) {
+        setTimeout(() => {
+          targetTurn.scrollIntoView({ behavior: "smooth", block: "center" });
+          targetTurn.classList.add("turn-highlight-pulse");
+          setTimeout(() => targetTurn.classList.remove("turn-highlight-pulse"), 2500);
+        }, 150);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", checkTurnHashAnchor);
+    window.addEventListener("hashchange", checkTurnHashAnchor);
+
+    // Tab & Page Loading Controller (Centered Mildly Blurred & Dimmed Overlay)
+    (function initTabLoadingController() {
+      const overlay = document.getElementById("chat-loading");
+      const titleEl = document.getElementById("page-loading-title");
+      const subEl = document.getElementById("page-loading-sub");
+      if (!overlay) return;
+
+      function updateLoaderDetails(url) {
+        if (!titleEl || !subEl) return;
+        const path = (url || "").toLowerCase();
+        if (path.includes("/tracker")) {
+          titleEl.textContent = "Loading Tracker...";
+          subEl.textContent = "Calculating daily macronutrients and vitamins";
+        } else if (path.includes("/meal-plan")) {
+          titleEl.textContent = "Loading Meal Planner...";
+          subEl.textContent = "Preparing nutrition recommendations";
+        } else if (path.includes("/groups")) {
+          titleEl.textContent = "Loading Nutrition Groups...";
+          subEl.textContent = "Syncing community groups and memberships";
+        } else if (path.includes("/profile")) {
+          titleEl.textContent = "Loading Profile...";
+          subEl.textContent = "Retrieving dietary and biometric profile";
+        } else if (path.includes("/login") || path.includes("/signup") || path.includes("/auth")) {
+          titleEl.textContent = "Loading Account...";
+          subEl.textContent = "Preparing secure authentication";
+        } else if (path.includes("/chats/") || path === "/" || path === "") {
+          titleEl.textContent = "Loading Meal Chat...";
+          subEl.textContent = "Retrieving conversation and verified food history";
+        } else {
+          titleEl.textContent = "Loading View...";
+          subEl.textContent = "Fetching verified nutrient data";
+        }
+      }
+
+      let timeoutHandle = null;
+
+      document.body.addEventListener("htmx:beforeRequest", (event) => {
+        const target = event.detail.target;
+        const elt = event.detail.elt;
+        const isPageLoad = (target && target.id === "chat-view") ||
+                           (elt && elt.getAttribute("hx-indicator") === "#chat-loading") ||
+                           (elt && elt.hasAttribute("data-sidebar-link")) ||
+                           (elt && elt.classList?.contains("sidebar-new-chat")) ||
+                           (elt && elt.classList?.contains("chat-history-link"));
+        if (isPageLoad) {
+          const reqPath = event.detail.requestConfig?.path || elt?.getAttribute("href") || elt?.getAttribute("hx-get") || "";
+          updateLoaderDetails(reqPath);
+          overlay.classList.add("is-active");
+          clearTimeout(timeoutHandle);
+          timeoutHandle = setTimeout(() => {
+            overlay.classList.remove("is-active");
+          }, 15000);
+        }
+      });
+
+      function dismissOverlay() {
+        clearTimeout(timeoutHandle);
+        overlay.classList.remove("is-active");
+      }
+
+      document.body.addEventListener("htmx:afterRequest", dismissOverlay);
+      document.body.addEventListener("htmx:afterSwap", dismissOverlay);
+      document.body.addEventListener("htmx:sendError", dismissOverlay);
+      document.body.addEventListener("htmx:responseError", dismissOverlay);
+    })();
+
+    initTrackerFromDOM();
+    syncMealPlanModeUI(false);
+    loadMealPlanHistory();
+    loadGroupsDirectory();
+  </script>
+  <!-- Modal: Log Meal to Tracker with Time Picker -->
+  <div id="log-to-tracker-modal" class="app-modal-backdrop hidden" role="dialog" aria-modal="true"
+    aria-labelledby="log-tracker-modal-title">
+    <div class="app-modal-dialog modal-dialog-compact">
+      <div class="flex items-start justify-between gap-3 border-b border-[#e3e7df] pb-4">
+        <div>
+          <p class="section-eyebrow !mb-1">Nutrient Tracker</p>
+          <h2 id="log-tracker-modal-title" class="serif m-0 text-2xl text-[#173c2c]">Log Food into Tracker</h2>
+        </div>
+        <button type="button" data-close-modal="log-to-tracker-modal" class="icon-button !h-8 !w-8"
+          aria-label="Close modal">✕</button>
+      </div>
+
+      <form id="log-to-tracker-form" class="mt-4 space-y-4">
+        <!-- Hidden Inputs for metadata -->
+        <input type="hidden" id="log-modal-message-id" name="message_id" value="">
+        <input type="hidden" id="log-modal-conversation-id" name="conversation_id" value="">
+
+        <!-- Dish Preview Card -->
+        <div class="rounded-xl border border-[#cde0d1] bg-gradient-to-r from-[#f4f9f4] to-[#ffffff] p-4">
+          <p class="mb-1 text-[11px] font-bold uppercase tracking-[0.8px] text-[#6d7871]">Selected Food / Meal</p>
+          <h3 id="log-modal-meal-name" class="serif m-0 text-lg text-[#173c2c]">Analyzed Meal</h3>
+          <div id="log-modal-nutrition-chips" class="mt-2 flex flex-wrap gap-2 text-xs">
+            <span id="log-modal-calories-chip" class="badge-pill badge-green">-- kcal</span>
+            <span id="log-modal-protein-chip" class="badge-pill badge-blue">--g Protein</span>
+            <span id="log-modal-carbs-chip" class="badge-pill badge-amber">--g Carbs</span>
+            <span id="log-modal-fat-chip" class="badge-pill badge-coral">--g Fat</span>
+          </div>
+        </div>
+
+        <!-- Meal Category Selector -->
+        <div>
+          <label class="form-label">Meal Category</label>
+          <div class="radio-tab-group" role="radiogroup" aria-label="Meal category">
+            <label class="radio-tab-card is-selected" data-modal-category-card>
+              <input type="radio" name="modal_meal_type" value="Breakfast" class="sr-only">
+              <span class="radio-tab-text font-bold text-xs">Breakfast</span>
+            </label>
+            <label class="radio-tab-card" data-modal-category-card>
+              <input type="radio" name="modal_meal_type" value="Lunch" class="sr-only">
+              <span class="radio-tab-text font-bold text-xs">Lunch</span>
+            </label>
+            <label class="radio-tab-card" data-modal-category-card>
+              <input type="radio" name="modal_meal_type" value="Snacks" class="sr-only">
+              <span class="radio-tab-text font-bold text-xs">Snacks</span>
+            </label>
+            <label class="radio-tab-card" data-modal-category-card>
+              <input type="radio" name="modal_meal_type" value="Dinner" class="sr-only">
+              <span class="radio-tab-text font-bold text-xs">Dinner</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Consumption Time Selection (Now vs Custom Time) -->
+        <div>
+          <label class="form-label">Consumption Time <span class="text-[#c65a42]">*</span></label>
+          <div class="grid grid-cols-2 gap-3 mb-3" role="radiogroup" aria-label="Time options">
+            <label class="radio-tab-card is-selected" id="time-opt-now-card" data-time-option-card>
+              <input type="radio" name="modal_time_option" value="now" checked class="sr-only">
+              <div class="flex items-center gap-2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <div class="text-left">
+                  <strong class="block text-xs font-bold text-[#173c2c]">Right Now</strong>
+                  <small id="log-modal-now-time-label" class="block text-[10.5px] text-[#6d7871]">Current time</small>
+                </div>
+              </div>
+            </label>
+            <label class="radio-tab-card" id="time-opt-custom-card" data-time-option-card>
+              <input type="radio" name="modal_time_option" value="custom" class="sr-only">
+              <div class="flex items-center gap-2">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <div class="text-left">
+                  <strong class="block text-xs font-bold text-[#173c2c]">Custom Time</strong>
+                  <small class="block text-[10.5px] text-[#6d7871]">Choose date &amp; time</small>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Custom Time Input (shown when Custom Time is selected) -->
+          <div id="log-modal-custom-time-container" class="hidden">
+            <label for="log-modal-custom-datetime" class="form-label !text-xs !font-medium text-[#53645a]">Select Date
+              &amp; Time</label>
+            <input id="log-modal-custom-datetime" type="datetime-local" class="form-input !py-2 !text-xs">
+            <span class="form-hint">Record food consumed earlier today or on previous dates.</span>
+          </div>
+        </div>
+
+        <div id="log-modal-feedback" class="hidden rounded-lg p-2.5 text-xs font-medium" role="status"></div>
+
+        <div class="form-actions-bar !mt-4">
+          <button type="button" data-close-modal="log-to-tracker-modal" class="btn-secondary">Cancel</button>
+          <button type="submit" id="log-modal-submit-btn" class="btn-primary">
+            Confirm &amp; Log to Tracker →
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="py" src="/src/chat.py"></script>
+</body>
+
+</html>

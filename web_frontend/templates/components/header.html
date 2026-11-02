@@ -1,0 +1,38 @@
+<header class="topbar">
+  <div class="flex h-full items-center justify-between px-4 sm:px-8">
+    <div class="flex items-center gap-2">
+      <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded="true" title="Collapse or expand sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <a class="flex items-center gap-[11px] text-[#202b26] no-underline" href="/" aria-label="NutriGuide home">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span class="text-base font-bold">nutri<span class="text-[#245c43]">guide</span></span>
+      </a>
+    </div>
+    <div class="flex items-center gap-3 text-[10px] text-[#6d7871] sm:gap-5 sm:text-xs">
+      <span class="topbar-model">{{ health.model_name or health.inference_backend|title if health else "Nutrition API" }}</span>
+      <span class="health inline-flex items-center gap-2" data-state="{{ 'online' if health and health.llama_server_reachable else 'offline' }}" role="status">
+        <span class="health-dot" aria-hidden="true"></span>
+        <span>{{ "Engine online" if health and health.llama_server_reachable else "API unavailable" }}</span>
+      </span>
+      <div id="topbar-auth-area" class="flex items-center gap-2 border-l border-[#e3e7df] pl-3 sm:pl-4">
+        {% if current_user %}
+          <a href="/profile" class="topbar-user-pill" title="View & edit your profile">
+            <span class="topbar-avatar overflow-hidden" aria-hidden="true">
+              {% if current_user.profile_picture %}
+                <img id="topbar-avatar-img" src="{{ current_user.profile_picture }}" alt="{{ current_user.name or current_user.username }}" class="h-full w-full object-cover">
+              {% else %}
+                <span id="topbar-avatar-initial">{{ (current_user.name or current_user.username or "U")[0]|upper }}</span>
+              {% endif %}
+            </span>
+            <span class="topbar-username" id="topbar-username-label">{{ current_user.name or current_user.username }}</span>
+          </a>
+          <button type="button" id="header-logout-btn" class="topbar-btn-ghost" title="Log out">Log out</button>
+        {% else %}
+          <a href="/login" class="topbar-btn-ghost">Log in</a>
+          <a href="/signup" class="topbar-btn-primary">Sign up</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</header>

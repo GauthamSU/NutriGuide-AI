@@ -1,0 +1,217 @@
+<main class="meal-plan-view page-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-8" data-page="meal-plan">
+  <div class="meal-plan-layout mx-auto max-w-[1320px]">
+    <section class="min-w-0">
+      <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="section-eyebrow">Personalized Culinary Blueprint</p>
+          <h1 class="serif mb-2 text-[32px] leading-tight sm:text-[38px]">Smart Meal Planner</h1>
+          <p class="max-w-2xl text-sm leading-relaxed text-[#6d7871]">Select your plan duration and dietary preference, pick any health focus areas, and describe your needs via text, photo, or voice note.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-[#d6e2d4] bg-[#f4f8f2] px-3.5 py-2.5 shadow-sm" role="status" aria-live="polite">
+          <span class="h-2 w-2 rounded-full bg-[#245c43]" id="meal-plan-mode-dot" aria-hidden="true"></span>
+          <span id="meal-plan-active-mode-badge" class="text-xs font-bold text-[#173c2c]">Daily Plan · Vegetarian (Veg)</span>
+        </div>
+      </div>
+
+      <form id="meal-plan-form" class="panel panel-padded mb-7" enctype="multipart/form-data">
+        <input type="hidden" name="owner_id" value="{{ owner_id }}">
+
+        <!-- Step 1: Duration Radio Tabs (Daily / Weekly / Monthly) -->
+        <fieldset class="mb-6 border-0 p-0">
+          <legend class="form-step-legend">
+            <span class="step-badge">1</span>
+            <span>Choose Plan Duration</span>
+          </legend>
+          <div class="duration-radio-tabs" role="radiogroup" aria-label="Meal plan duration">
+            <label class="duration-radio-tab is-selected" data-duration-tab>
+              <input type="radio" name="duration" value="daily" checked class="sr-only">
+              <span class="duration-tab-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14h.01"/></svg>
+              </span>
+              <span class="duration-tab-text">
+                <strong>Daily Plan</strong>
+                <small>1-Day tailored menu</small>
+              </span>
+            </label>
+            <label class="duration-radio-tab" data-duration-tab>
+              <input type="radio" name="duration" value="weekly" class="sr-only">
+              <span class="duration-tab-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h8M8 18h5"/></svg>
+              </span>
+              <span class="duration-tab-text">
+                <strong>Weekly Plan</strong>
+                <small>7-Day structured rotation</small>
+              </span>
+            </label>
+            <label class="duration-radio-tab" data-duration-tab>
+              <input type="radio" name="duration" value="monthly" class="sr-only">
+              <span class="duration-tab-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><grid><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></grid></svg>
+              </span>
+              <span class="duration-tab-text">
+                <strong>Monthly Plan</strong>
+                <small>4-Week blueprint</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- Step 2: Dietary Type Radio Selector (Veg / Non-Veg / Vegan / Egg) -->
+        <fieldset class="mb-6 border-0 p-0">
+          <legend class="form-step-legend">
+            <span class="step-badge">2</span>
+            <span>Select Dietary Preference</span>
+          </legend>
+          <div class="diet-radio-grid" role="radiogroup" aria-label="Dietary preference">
+            <label class="diet-radio-card is-selected" data-diet-tab data-diet-color="veg">
+              <input type="radio" name="diet_type" value="veg" checked class="sr-only">
+              <span class="diet-mark diet-mark-veg" aria-hidden="true"><i></i></span>
+              <span class="diet-card-body">
+                <strong class="diet-card-title">Veg</strong>
+                <small class="diet-card-sub">Vegetarian · Dairy & plants</small>
+              </span>
+            </label>
+            <label class="diet-radio-card" data-diet-tab data-diet-color="non-veg">
+              <input type="radio" name="diet_type" value="non-veg" class="sr-only">
+              <span class="diet-mark diet-mark-nonveg" aria-hidden="true"><i></i></span>
+              <span class="diet-card-body">
+                <strong class="diet-card-title">Non-Veg</strong>
+                <small class="diet-card-sub">Poultry, fish, meat & plants</small>
+              </span>
+            </label>
+            <label class="diet-radio-card" data-diet-tab data-diet-color="vegan">
+              <input type="radio" name="diet_type" value="vegan" class="sr-only">
+              <span class="diet-mark diet-mark-vegan" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+              </span>
+              <span class="diet-card-body">
+                <strong class="diet-card-title">Vegan</strong>
+                <small class="diet-card-sub">100% plant-based · Dairy-free</small>
+              </span>
+            </label>
+            <label class="diet-radio-card" data-diet-tab data-diet-color="egg">
+              <input type="radio" name="diet_type" value="egg" class="sr-only">
+              <span class="diet-mark diet-mark-egg" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4.97 0 8-3.58 8-8.5C20 7.5 16 2 12 2S4 7.5 4 13.5C4 18.42 7.03 22 12 22Z"/></svg>
+              </span>
+              <span class="diet-card-body">
+                <strong class="diet-card-title">Egg</strong>
+                <small class="diet-card-sub">Eggetarian · Eggs & veg</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- Step 3: Health & Nutrition Focus Tags -->
+        <fieldset class="mb-6 border-0 p-0">
+          <legend class="form-step-legend">
+            <span class="step-badge">3</span>
+            <span>What would you like to focus on?</span>
+          </legend>
+          <div class="flex flex-wrap gap-2.5">
+            {% for preference in [
+              "Blood-sugar conscious",
+              "Heart-healthy",
+              "Weight management",
+              "Healthy weight gain",
+              "Plant-forward",
+              "High-protein",
+              "Gluten-free",
+              "Dairy-free"
+            ] %}
+              <button type="button" class="meal-preference" data-preference="{{ preference }}" aria-pressed="false">
+                <span class="pref-dot" aria-hidden="true"></span>
+                <span>{{ preference }}</span>
+              </button>
+            {% endfor %}
+          </div>
+          {% if current_user and current_user.allergies %}
+            <p class="m-0 mt-3 inline-flex items-center gap-2 rounded-lg border border-[#e2e9df] bg-[#f4f8f2] px-3 py-1.5 text-xs text-[#245c43]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span><strong>Profile allergies active:</strong> {{ current_user.allergies }}</span>
+            </p>
+          {% endif %}
+        </fieldset>
+
+        <!-- Step 4: Multimodal Custom Request (Text + Image + Voice Note) -->
+        <div class="mb-2">
+          <label for="meal-plan-request" class="form-step-legend">
+            <span class="step-badge">4</span>
+            <span>Specific Use Case, Ingredients, Photo, or Voice Note</span>
+          </label>
+          <div class="meal-plan-composer">
+            <textarea id="meal-plan-request" name="custom_request" rows="3" maxlength="2000" placeholder="Describe your schedule, regional cuisine preferences, ingredients in your kitchen, calorie targets, or attach a photo / record a voice note below…" class="meal-plan-textarea"></textarea>
+
+            <div id="meal-plan-attachment-chips" class="meal-plan-chips" aria-live="polite"></div>
+
+            <div class="meal-plan-composer-toolbar">
+              <div class="flex flex-wrap items-center gap-2">
+                <input id="meal-plan-image" name="image" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
+                <input id="meal-plan-voice" name="voice" type="file" accept="audio/wav,audio/mpeg" class="hidden">
+
+                <button type="button" id="meal-plan-attach-btn" class="composer-tool-btn" title="Attach a food or pantry photo">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Add Photo</span>
+                </button>
+
+                <button type="button" id="meal-plan-mic-btn" class="composer-tool-btn" title="Record a voice note" aria-label="Record a voice note">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg>
+                  <span id="meal-plan-mic-label">Voice Note</span>
+                </button>
+
+                <button type="button" id="meal-plan-audio-upload-btn" class="composer-tool-btn" title="Upload an audio file (WAV or MP3)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Upload Audio</span>
+                </button>
+
+                <span id="meal-plan-recording-status" class="recording-wave hidden items-center gap-[3px] px-2" role="status" aria-label="Recording audio">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  <span class="ml-1.5 text-[11px] font-semibold text-[#c65a42]">Recording… click to stop</span>
+                </span>
+              </div>
+              <span class="text-[11px] text-[#89938c]">Supports text, JPEG/PNG/WebP & WAV/MP3</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Properly Aligned Form Action Footer -->
+        <div class="meal-plan-footer">
+          <p class="meal-plan-disclaimer">General food-planning ideas only. For a medical condition or clinical nutrition therapy, consult a qualified healthcare professional.</p>
+          <button id="generate-meal-plan" type="submit" class="btn-create-plan">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <span id="generate-meal-plan-label">Create daily meal plan</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+
+        <p id="meal-plan-error" class="mt-4 hidden rounded-lg border border-[#f1d8d1] bg-[#fff9f7] p-3.5 text-sm text-[#9d4534]" role="alert"></p>
+      </form>
+
+      <!-- Generated Meal Plan Results -->
+      <section id="meal-plan-result" class="hidden pb-10" aria-live="polite">
+        <div class="panel panel-padded mb-5 border-[#cfe0d2] bg-gradient-to-br from-white to-[#f6faf5]">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p class="m-0 text-[11px] font-bold uppercase tracking-[1.2px] text-[#245c43]">Why this plan works for you</p>
+            <div id="meal-plan-meta-badges" class="flex flex-wrap items-center gap-1.5"></div>
+          </div>
+          <p id="meal-plan-transcription" class="hidden mb-3 rounded-lg border border-[#dce6da] bg-[#eef4ec] px-3.5 py-2.5 text-xs text-[#245c43]"></p>
+          <p id="meal-plan-summary" class="m-0 text-sm leading-relaxed text-[#35433b]"></p>
+        </div>
+        <div id="meal-plan-sections" class="meal-sections-grid"></div>
+      </section>
+    </section>
+
+    <!-- Saved Meal Plans Sidebar -->
+    <aside class="meal-plan-history panel panel-padded" aria-label="Previous meal plans">
+      <div class="mb-3.5 flex items-center justify-between gap-2 border-b border-[#e3e7df] pb-3">
+        <div>
+          <p class="m-0 text-[10px] font-bold uppercase tracking-[1px] text-[#89938c]">Your library</p>
+          <h2 class="serif m-0 text-xl">Saved Plans</h2>
+        </div>
+        <span id="meal-plan-history-count" class="rounded-full bg-[#edf2e9] px-2.5 py-1 text-[11px] font-bold text-[#245c43]">0</span>
+      </div>
+      <p id="meal-plan-history-status" class="m-0 py-2 text-xs leading-relaxed text-[#89938c]" role="status">Loading your saved plans…</p>
+      <div id="meal-plan-history-list" class="meal-plan-history-list" aria-live="polite"></div>
+    </aside>
+  </div>
+</main>

@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from nutrition.schemas import NutrientAnalysisDataSchema
 
 
@@ -63,6 +63,8 @@ SAMPLE_ANALYSIS_DICT = {
 
 
 class NutritionAPITests(TestCase):
+    databases = {"default", "nutrition"}
+
     @classmethod
     def setUpTestData(cls):
         from nutrition.models import (
@@ -219,8 +221,14 @@ class NutritionAPITests(TestCase):
         self.assertEqual(saved_record["response"], response.json())
         self.assertEqual(saved_record["response"]["request_id"], "debug-request-1")
 
+    @patch(
+        "nutrition.services.llama_client.LlamaCppClient.transcribe_audio",
+        return_value="My breakfast",
+    )
     @patch("nutrition.services.llama_client.LlamaCppClient.identify_dish_and_ingredients")
-    def test_analyze_multimodal_endpoint_with_image_and_voice(self, mock_identify):
+    def test_analyze_multimodal_endpoint_with_image_and_voice(
+        self, mock_identify, mock_transcribe
+    ):
         mock_identify.return_value = SAMPLE_ANALYSIS_DICT
         fake_image = SimpleUploadedFile("meal.jpg", b"\xff\xd8\xff\xe0fakejpeg", content_type="image/jpeg")
         fake_voice = SimpleUploadedFile("note.wav", b"RIFFfakewav", content_type="audio/wav")
@@ -237,6 +245,7 @@ class NutritionAPITests(TestCase):
         body = response.json()
         self.assertEqual(body["status"], "completed")
         self.assertEqual(body["input_modalities"], ["text", "image", "voice"])
+        self.assertEqual(body["transcription"], "My breakfast")
 
     def test_analyze_multimodal_rejects_empty_input(self):
         response = self.client.post("/api/nutrition/analyze", data={})
@@ -740,7 +749,7 @@ class InferenceBackendSwitchingTests(TestCase):
         raw_response = '{"dish_name":"Curd Rice","ingredients":[{"serving_size'
         completion = MagicMock()
         completion.choices[0].message.content = raw_response
-        completion.choices[0].finish_reason = "length"
+        completion.choices[0].finish_reason = "stop"
         completion.usage = None
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -752,18 +761,58 @@ class InferenceBackendSwitchingTests(TestCase):
                     "create",
                     return_value=completion,
                 ) as mock_create:
-                    with self.assertRaises(ValueError):
+                    with self.assertRaisesRegex(ValueError, "finish_reason=stop") as error:
                         client.identify_dish_and_ingredients(input_text="Curd Rice")
 
             saved_record = json.loads(debug_path.read_text(encoding="utf-8"))
 
         self.assertEqual(saved_record["raw_response"], raw_response)
-        self.assertEqual(saved_record["finish_reason"], "length")
+        self.assertEqual(saved_record["finish_reason"], "stop")
         self.assertIn("parse_error", saved_record)
         self.assertIsNone(saved_record["parsed_response"])
-        request = mock_create.call_args.kwargs
+        self.assertIn("response excerpt", str(error.exception))
+        self.assertEqual(saved_record["retry_count"], 0)
+        request = mock_create.call_args_list[0].kwargs
         self.assertEqual(request["response_format"], {"type": "json_object"})
         self.assertEqual(request["max_tokens"], 1800)
+
+    @override_settings(GEMINI_API_KEY="test-api-key-12345")
+    def test_identification_retries_truncated_response_with_larger_token_limit(self):
+        from nutrition.services.llama_client import LlamaCppClient
+
+        first_response = MagicMock()
+        first_response.choices[0].message.content = '{"dish_name":"Curd Rice","ingredients":['
+        first_response.choices[0].finish_reason = "length"
+        first_response.usage = None
+        second_response = MagicMock()
+        second_response.choices[0].message.content = json.dumps({
+            "dish_name": "Curd Rice",
+            "recognized_input_summary": "Curd rice",
+            "ingredients": [],
+        })
+        second_response.choices[0].finish_reason = "stop"
+        second_response.usage = None
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            debug_path = Path(temp_dir) / "llm_response_debug.json"
+            with override_settings(LLM_RESPONSE_DEBUG_FILE=debug_path):
+                client = LlamaCppClient(backend="gemini")
+                with patch.object(
+                    client.client.chat.completions,
+                    "create",
+                    side_effect=[first_response, second_response],
+                ) as mock_create:
+                    result = client.identify_dish_and_ingredients(input_text="Curd Rice")
+
+            saved_record = json.loads(debug_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["dish_name"], "Curd Rice")
+        self.assertEqual(mock_create.call_count, 2)
+        self.assertEqual(mock_create.call_args_list[0].kwargs["max_tokens"], 1800)
+        self.assertEqual(mock_create.call_args_list[1].kwargs["max_tokens"], 4096)
+        self.assertEqual(saved_record["retry_count"], 1)
+        self.assertEqual(saved_record["previous_attempts"][0]["finish_reason"], "length")
+        self.assertEqual(saved_record["parsed_response"], result)
 
     @override_settings(GEMINI_API_KEY="test-api-key-12345")
     def test_identification_saves_parsed_json_response(self):
@@ -817,3 +866,740 @@ class InferenceBackendSwitchingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["inference_backend"], "gemini")
+
+
+class FrontendCorsTests(TestCase):
+    @override_settings(CORS_ALLOWED_ORIGINS=["http://127.0.0.1:5500"])
+    def test_allowed_frontend_origin_can_preflight_api_request(self):
+        response = self.client.options(
+            "/api/nutrition/analyze/text",
+            HTTP_ORIGIN="http://127.0.0.1:5500",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(
+            response["Access-Control-Allow-Origin"], "http://127.0.0.1:5500"
+        )
+        self.assertIn("POST", response["Access-Control-Allow-Methods"])
+
+    @override_settings(CORS_ALLOWED_ORIGINS=["http://127.0.0.1:5500"])
+    def test_unconfigured_origin_does_not_receive_cors_permission(self):
+        response = self.client.get(
+            "/api/nutrition/health",
+            HTTP_ORIGIN="https://untrusted.example",
+        )
+
+        self.assertNotIn("Access-Control-Allow-Origin", response)
+
+
+class GraphNodeOutputNormalizationTests(SimpleTestCase):
+    def test_single_health_insight_string_remains_one_list_item(self):
+        from nutrition.graph.nodes import _normalize_string_list
+
+        insight = "A longer health insight should stay together."
+        self.assertEqual(_normalize_string_list(insight), [insight])
+
+    def test_insight_list_entries_are_preserved(self):
+        from nutrition.graph.nodes import _normalize_string_list
+
+        insights = ["First insight", "Second insight"]
+        self.assertEqual(_normalize_string_list(insights), insights)
+
+    @patch("nutrition.graph.nodes.LlamaCppClient")
+    def test_identify_node_does_not_split_single_health_insight(self, mock_client_type):
+        from nutrition.graph.nodes import identify_dish_node
+
+        insight = "A complete health insight stays as one sentence."
+        mock_client_type.return_value.identify_dish_and_ingredients.return_value = {
+            "dish_name": "Lentil soup",
+            "recognized_input_summary": "Lentil soup",
+            "ingredients": [],
+            "health_insights": insight,
+        }
+
+        node_result = identify_dish_node({"input_text": "lentil soup"})
+
+        self.assertEqual(node_result["health_insights"], [insight])
+
+
+class UserAuthAndProfileTests(TestCase):
+    databases = {"default", "nutrition"}
+
+    def setUp(self):
+        self.media_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.media_directory.cleanup)
+        self.media_settings = override_settings(MEDIA_ROOT=self.media_directory.name)
+        self.media_settings.enable()
+        self.addCleanup(self.media_settings.disable)
+        self.client = Client()
+
+    def test_weak_passwords_are_rejected_on_signup(self):
+        for weak_pw in ("short1!", "alllowercase1!", "ALLUPPERCASE1!", "NoDigitsHere!", "NoSpecialChar123"):
+            resp = self.client.post(
+                "/api/auth/signup",
+                data={
+                    "username": "weak_pw_user",
+                    "email": "weak@example.com",
+                    "password": weak_pw,
+                },
+                content_type="application/json",
+            )
+            self.assertEqual(resp.status_code, 400, f"Weak password '{weak_pw}' should be rejected")
+            self.assertIn("Please choose a stronger password", resp.json()["detail"])
+
+    def test_unauthenticated_user_cannot_create_profile_or_group_even_with_owner_id(self):
+        unauth_profile = self.client.post(
+            "/api/profile",
+            data={
+                "name": "Guest Attempting Profile",
+                "age": 30,
+                "owner_id": "11111111-2222-3333-4444-555555555555",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(unauth_profile.status_code, 401)
+        self.assertIn("log in or sign up", unauth_profile.json()["detail"].lower())
+
+        unauth_group = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Guest Group",
+                "description": "Should not be allowed",
+                "is_public": True,
+                "owner_id": "11111111-2222-3333-4444-555555555555",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(unauth_group.status_code, 401)
+        self.assertIn("log in or sign up", unauth_group.json()["detail"].lower())
+
+    def test_user_signup_login_and_me_flow(self):
+        # 1. Signup with strong password
+        signup_resp = self.client.post(
+            "/api/auth/signup",
+            data={
+                "username": "alice_nutri",
+                "email": "alice@example.com",
+                "password": "SecurePassword@123",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(signup_resp.status_code, 200)
+        signup_data = signup_resp.json()
+        self.assertEqual(signup_data["status"], "ok")
+        self.assertIn("token", signup_data)
+        self.assertEqual(signup_data["user"]["username"], "alice_nutri")
+        self.assertEqual(signup_data["user"]["email"], "alice@example.com")
+        self.assertTrue(signup_data["user"]["owner_id"])
+
+        # 2. Duplicate username or email rejected
+        dup_user_resp = self.client.post(
+            "/api/auth/signup",
+            data={
+                "username": "ALICE_NUTRI",
+                "email": "different@example.com",
+                "password": "SecurePassword@123",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(dup_user_resp.status_code, 400)
+        self.assertIn("already taken", dup_user_resp.json()["detail"].lower())
+
+        dup_email_resp = self.client.post(
+            "/api/auth/signup",
+            data={
+                "username": "bob_nutri",
+                "email": "ALICE@example.com",
+                "password": "SecurePassword@123",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(dup_email_resp.status_code, 400)
+        self.assertIn("already exists", dup_email_resp.json()["detail"].lower())
+
+        # 3. Login with username or email
+        login_resp = self.client.post(
+            "/api/auth/login",
+            data={
+                "username_or_email": "alice@example.com",
+                "password": "SecurePassword@123",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        login_data = login_resp.json()
+        self.assertEqual(login_data["user"]["username"], "alice_nutri")
+        token = login_data["token"]
+
+        # 4. Fetch /api/auth/me using Bearer token
+        me_resp = self.client.get(
+            "/api/auth/me",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertEqual(me_resp.status_code, 200)
+        self.assertEqual(me_resp.json()["user"]["username"], "alice_nutri")
+
+    def test_user_profile_update_with_profile_picture_and_retrieval(self):
+        from chat_history.models import UserProfile
+
+        signup_resp = self.client.post(
+            "/api/auth/signup",
+            data={
+                "username": "profile_tester",
+                "email": "profile@example.com",
+                "password": "ProfilePass#1234",
+            },
+            content_type="application/json",
+        ).json()
+        token = signup_resp["token"]
+        owner_id = signup_resp["user"]["owner_id"]
+        png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+
+        # Upload profile picture as a file via multipart endpoint (/api/profile/upload)
+        update_resp = self.client.post(
+            "/api/profile/upload",
+            data={
+                "name": "Aarav Sharma",
+                "age": "28",
+                "height_cm": "175.0",
+                "weight_kg": "70.0",
+                "gender": "Male",
+                "allergies": "Peanuts, Shellfish",
+                "bio": "Marathon runner training for a sub-4h finish, prefers South Indian meals.",
+                "profile_picture_file": SimpleUploadedFile("avatar.png", png_bytes, content_type="image/png"),
+            },
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertEqual(update_resp.status_code, 200)
+        profile = update_resp.json()["user"]["profile"]
+        expected_avatar_url = f"/api/profile/avatar/{owner_id}"
+        self.assertEqual(profile["name"], "Aarav Sharma")
+        self.assertEqual(profile["age"], 28)
+        self.assertEqual(profile["height_cm"], 175.0)
+        self.assertEqual(profile["weight_kg"], 70.0)
+        self.assertEqual(profile["gender"], "Male")
+        self.assertEqual(profile["allergies"], "Peanuts, Shellfish")
+        self.assertIn("Marathon runner", profile["bio"])
+        self.assertEqual(profile["profile_picture"], expected_avatar_url)
+        self.assertTrue(profile["has_profile_picture"])
+        self.assertAlmostEqual(profile["bmi"], 22.9, places=1)
+
+        # Verify the profile image is stored as a physical file in MEDIA_ROOT/user_profiles/avatars/... inside core_app DB
+        db_profile = UserProfile.objects.using("default").get(owner_id=owner_id)
+        self.assertTrue(db_profile.profile_picture.name.startswith("user_profiles/avatars/"))
+        with db_profile.profile_picture.open("rb") as f:
+            self.assertEqual(f.read(), png_bytes)
+
+        # Verify GET /api/profile/avatar/{owner_id} streams the stored image file
+        avatar_resp = self.client.get(expected_avatar_url)
+        self.assertEqual(avatar_resp.status_code, 200)
+        self.assertEqual(avatar_resp["Content-Type"], "image/png")
+        self.assertEqual(b"".join(avatar_resp.streaming_content), png_bytes)
+
+        # Verify GET /api/profile returns the updated fields including profile_picture URL
+        get_resp = self.client.get(
+            "/api/profile",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertEqual(get_resp.status_code, 200)
+        fetched_profile = get_resp.json()["user"]["profile"]
+        self.assertEqual(fetched_profile["name"], "Aarav Sharma")
+        self.assertEqual(fetched_profile["allergies"], "Peanuts, Shellfish")
+        self.assertEqual(fetched_profile["profile_picture"], expected_avatar_url)
+
+
+class NutritionGroupsTests(TestCase):
+    databases = {"default", "nutrition"}
+
+    @classmethod
+    def setUpTestData(cls):
+        from nutrition.models import Food, FoodGroup, ProximateNutrient
+        grp_a, _ = FoodGroup.objects.get_or_create(code="A", defaults={"name": "Cereals and Millets"})
+        food_rice, _ = Food.objects.get_or_create(
+            food_code="A014",
+            defaults={"group": grp_a, "name": "Rice, parboiled, milled"},
+        )
+        ProximateNutrient.objects.get_or_create(
+            food=food_rice,
+            defaults={
+                "energy_kcal": 350.0,
+                "protein_g": 8.0,
+                "carbohydrates_g": 77.0,
+                "total_fat_g": 0.6,
+                "total_fiber_g": 3.7,
+            },
+        )
+
+    def setUp(self):
+        self.client = Client()
+        # Create two users: Alice and Bob
+        self.alice = self.client.post(
+            "/api/auth/signup",
+            data={"username": "alice", "email": "alice@nutri.ai", "password": "StrongPass@123"},
+            content_type="application/json",
+        ).json()
+        self.bob = self.client.post(
+            "/api/auth/signup",
+            data={"username": "bob", "email": "bob@nutri.ai", "password": "StrongPass@123"},
+            content_type="application/json",
+        ).json()
+        self.alice_headers = {"HTTP_AUTHORIZATION": f"Bearer {self.alice['token']}"}
+        self.bob_headers = {"HTTP_AUTHORIZATION": f"Bearer {self.bob['token']}"}
+
+    def test_public_group_requires_unique_name_and_supports_search(self):
+        # Alice creates a public group "Morning Runners Club"
+        pub1 = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Morning Runners Club",
+                "description": "Public nutrition tracking for runners",
+                "is_public": True,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(pub1.status_code, 200)
+        self.assertTrue(pub1.json()["group"]["is_public"])
+
+        # Bob searches public groups by query
+        search_hit = self.client.get("/api/groups?q=Runners", **self.bob_headers).json()
+        self.assertEqual(len(search_hit["public_groups"]), 1)
+        self.assertEqual(search_hit["public_groups"][0]["name"], "Morning Runners Club")
+
+        search_miss = self.client.get("/api/groups?q=NonExistentClubXYZ", **self.bob_headers).json()
+        self.assertEqual(len(search_miss["public_groups"]), 0)
+
+        # Bob tries to create another PUBLIC group with the same name (case-insensitive) -> rejected
+        pub_dup = self.client.post(
+            "/api/groups",
+            data={
+                "name": "morning runners club",
+                "description": "Duplicate public group",
+                "is_public": True,
+            },
+            content_type="application/json",
+            **self.bob_headers,
+        )
+        self.assertEqual(pub_dup.status_code, 400)
+        self.assertIn("already exists", pub_dup.json()["detail"])
+
+        # Both Alice and Bob CAN create PRIVATE groups with the same name "Family Kitchen"
+        priv1 = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Family Kitchen",
+                "description": "Alice's private family group",
+                "is_public": False,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(priv1.status_code, 200)
+
+        priv2 = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Family Kitchen",
+                "description": "Bob's private family group",
+                "is_public": False,
+            },
+            content_type="application/json",
+            **self.bob_headers,
+        )
+        self.assertEqual(priv2.status_code, 200)
+        self.assertNotEqual(priv1.json()["group"]["id"], priv2.json()["group"]["id"])
+
+    def test_group_membership_and_collective_nutrition_tracking(self):
+        # Alice creates a private group and adds Bob by username
+        create_resp = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Spartan Squad",
+                "description": "Collective macro tracking",
+                "is_public": False,
+                "members": ["bob"],
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        group_id = create_resp.json()["group"]["id"]
+        self.assertEqual(create_resp.json()["group"]["member_count"], 2)
+
+        # Alice logs a meal with explicit macros
+        meal1 = self.client.post(
+            f"/api/groups/{group_id}/meals",
+            data={
+                "meal_title": "Post-Workout Protein Shake",
+                "calories_kcal": 400.0,
+                "protein_g": 35.0,
+                "carbohydrates_g": 42.0,
+                "fat_g": 8.0,
+                "fiber_g": 5.0,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(meal1.status_code, 200)
+
+        # Bob logs a meal with 0 calories so it auto-resolves "Rice" from IFCT DB (350 kcal / 100g -> 700 kcal for 200g)
+        meal2 = self.client.post(
+            f"/api/groups/{group_id}/meals",
+            data={
+                "meal_title": "Rice",
+                "serving_grams": 200.0,
+            },
+            content_type="application/json",
+            **self.bob_headers,
+        )
+        self.assertEqual(meal2.status_code, 200)
+
+        # Fetch group detail to verify collective nutrition totals and per-member breakdown
+        detail_resp = self.client.get(
+            f"/api/groups/{group_id}",
+            **self.alice_headers,
+        )
+        self.assertEqual(detail_resp.status_code, 200)
+        group_data = detail_resp.json()["group"]
+        collective = group_data["collective_nutrition"]
+        self.assertEqual(collective["total_meals_logged"], 2)
+        self.assertAlmostEqual(collective["total_calories_kcal"], 1100.0, places=0)
+        self.assertAlmostEqual(collective["total_protein_g"], 51.0, places=0)
+        self.assertEqual(len(group_data["member_breakdown"]), 2)
+
+
+class ExplicitTrackerAndDeletionTests(TestCase):
+    databases = {"default", "nutrition"}
+
+    @classmethod
+    def setUpTestData(cls):
+        from nutrition.models import Food, FoodGroup, MineralNutrient, ProximateNutrient, VitaminNutrient
+        grp_a, _ = FoodGroup.objects.get_or_create(code="A", defaults={"name": "Cereals and Millets"})
+        food_rice, _ = Food.objects.get_or_create(
+            food_code="A014",
+            defaults={"group": grp_a, "name": "Rice, parboiled, milled"},
+        )
+        ProximateNutrient.objects.get_or_create(
+            food=food_rice,
+            defaults={
+                "energy_kcal": 350.0,
+                "protein_g": 8.0,
+                "carbohydrates_g": 77.0,
+                "total_fat_g": 0.6,
+                "total_fiber_g": 3.7,
+            },
+        )
+        VitaminNutrient.objects.get_or_create(food=food_rice, defaults={"thiamine_b1_mg": 0.25})
+        MineralNutrient.objects.get_or_create(food=food_rice, defaults={"iron_mg": 1.5, "calcium_mg": 12.0})
+
+    def setUp(self):
+        self.client = Client()
+        self.owner_id = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        self.conversation_id = "11111111-2222-4333-8444-555555555555"
+
+    @patch("nutrition.services.llama_client.LlamaCppClient.identify_dish_and_ingredients")
+    def test_chat_does_not_auto_log_to_tracker_unless_explicit_or_button_clicked(self, mock_identify):
+        mock_identify.return_value = {
+            "dish_name": "Steamed Rice Bowl",
+            "recognized_input_summary": "100g steamed rice",
+            "ingredients": [
+                {"ingredient_name": "Rice", "estimated_weight_grams": 100.0, "serving_size_description": "1 bowl"}
+            ],
+            "dietary_tags": ["Vegetarian"],
+            "health_insights": ["Good source of energy."],
+        }
+
+        # 1. Normal chat query about a food product -> NOT logged to tracker
+        chat_resp = self.client.post(
+            "/api/nutrition/analyze/text",
+            data={
+                "text": "What are the nutrients in a bowl of steamed rice?",
+                "owner_id": self.owner_id,
+                "conversation_id": self.conversation_id,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(chat_resp.status_code, 200)
+        chat_data = chat_resp.json()
+        self.assertFalse(chat_data["logged_to_tracker"])
+        self.assertIsNone(chat_data["tracker_log_id"])
+        msg1_id = chat_data["message_id"]
+        self.assertIsNotNone(msg1_id)
+
+        # Verify tracker is still empty (0 meals)
+        tracker_empty = self.client.get(f"/api/tracker?owner_id={self.owner_id}").json()
+        self.assertEqual(tracker_empty["periods"]["daily"]["meals_count"], 0)
+        self.assertEqual(tracker_empty["periods"]["daily"]["macronutrients"]["calories_kcal"], 0.0)
+
+        # 2. User clicks "Log to Tracker" button on msg1_id -> logged to tracker!
+        btn_log_resp = self.client.post(
+            "/api/tracker/log",
+            data={
+                "owner_id": self.owner_id,
+                "conversation_id": self.conversation_id,
+                "message_id": msg1_id,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(btn_log_resp.status_code, 200)
+        btn_log_data = btn_log_resp.json()
+        self.assertEqual(btn_log_data["meal"]["logged_via"], "chat_button")
+        first_log_id = btn_log_data["meal"]["id"]
+
+        tracker_after_btn = self.client.get(f"/api/tracker?owner_id={self.owner_id}").json()
+        self.assertEqual(tracker_after_btn["periods"]["daily"]["meals_count"], 1)
+        self.assertGreater(tracker_after_btn["periods"]["daily"]["macronutrients"]["calories_kcal"], 300.0)
+        self.assertGreaterEqual(len(tracker_after_btn["periods"]["daily"]["micronutrients"]["vitamins"]), 1)
+        self.assertGreaterEqual(len(tracker_after_btn["periods"]["daily"]["micronutrients"]["minerals"]), 1)
+
+        # 3. User sends explicit chat intent ("Please log this rice bowl to my tracker") -> auto-logged!
+        explicit_resp = self.client.post(
+            "/api/nutrition/analyze/text",
+            data={
+                "text": "Please log this steamed rice bowl to my tracker",
+                "owner_id": self.owner_id,
+                "conversation_id": self.conversation_id,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(explicit_resp.status_code, 200)
+        explicit_data = explicit_resp.json()
+        self.assertTrue(explicit_data["logged_to_tracker"])
+        self.assertIsNotNone(explicit_data["tracker_log_id"])
+
+        # Verify daily, weekly, and monthly periods all reflect 2 logged meals
+        tracker_two = self.client.get(f"/api/tracker?owner_id={self.owner_id}").json()
+        for period_name in ("daily", "weekly", "monthly"):
+            self.assertEqual(tracker_two["periods"][period_name]["meals_count"], 2)
+            self.assertGreater(tracker_two["periods"][period_name]["macronutrients"]["calories_kcal"], 600.0)
+
+        # 4. Delete a tracked meal from the tracker
+        del_track_resp = self.client.post(
+            f"/api/tracker/meals/{first_log_id}/delete?owner_id={self.owner_id}"
+        )
+        self.assertEqual(del_track_resp.status_code, 200)
+        tracker_after_del = self.client.get(f"/api/tracker?owner_id={self.owner_id}").json()
+        self.assertEqual(tracker_after_del["periods"]["daily"]["meals_count"], 1)
+
+    def test_delete_individual_chat_message_conversation_and_meal_plan(self):
+        from chat_history.services import save_chat_message, save_meal_plan
+
+        # Save 2 chat messages in a conversation
+        m1 = save_chat_message(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            user_query="Product 1: Almond Milk",
+            transcription="",
+            modalities=["text"],
+            ai_response={"dish_name": "Almond Milk", "ingredients": []},
+        )
+        m2 = save_chat_message(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            user_query="Product 2: Greek Yogurt",
+            transcription="",
+            modalities=["text"],
+            ai_response={"dish_name": "Greek Yogurt", "ingredients": []},
+        )
+
+        # Delete individual chat message m1
+        del_msg_resp = self.client.delete(
+            f"/api/chat-history/conversations/{self.conversation_id}/messages/{m1.id}?owner_id={self.owner_id}"
+        )
+        self.assertEqual(del_msg_resp.status_code, 200)
+        self.assertFalse(del_msg_resp.json()["conversation_deleted"])
+
+        conv_after = self.client.get(
+            f"/api/chat-history/conversations/{self.conversation_id}?owner_id={self.owner_id}"
+        ).json()
+        self.assertEqual(len(conv_after["messages"]), 1)
+        self.assertEqual(conv_after["messages"][0]["id"], str(m2.id))
+
+        # Delete entire chat conversation
+        del_conv_resp = self.client.delete(
+            f"/api/chat-history/conversations/{self.conversation_id}?owner_id={self.owner_id}"
+        )
+        self.assertEqual(del_conv_resp.status_code, 200)
+        convs_list = self.client.get(f"/api/chat-history/conversations?owner_id={self.owner_id}").json()
+        self.assertEqual(len(convs_list), 0)
+
+        # Save & delete a meal plan
+        saved_plan = save_meal_plan(
+            owner_id=self.owner_id,
+            preferences=["High-protein"],
+            custom_request="Test plan",
+            plan={"summary": "Test", "breakfast": {"options": []}},
+        )
+        del_plan_resp = self.client.delete(
+            f"/api/chat-history/meal-plans/{saved_plan['id']}?owner_id={self.owner_id}"
+        )
+        self.assertEqual(del_plan_resp.status_code, 200)
+        plans_after = self.client.get(f"/api/chat-history/meal-plans?owner_id={self.owner_id}").json()
+        self.assertEqual(len(plans_after), 0)
+
+
+class EnhancedMealPlanTests(TestCase):
+    databases = {"default", "nutrition"}
+
+    def setUp(self):
+        self.client = Client()
+
+    @patch("nutrition.services.llama_client.LlamaCppClient.generate_structured_response")
+    def test_meal_plan_duration_diet_type_and_profile_context(self, mock_gen):
+        mock_gen.return_value = {
+            "summary": "Weekly Vegan High-Protein Plan",
+            "breakfast": {"options": [{"name": "Ragi Porridge", "details": "1 bowl", "why_it_fits": "High calcium"}]},
+            "lunch": {"options": [{"name": "Chana Masala & Brown Rice", "details": "1 plate", "why_it_fits": "Complete protein"}]},
+            "snacks": {"options": [{"name": "Roasted Makhana", "details": "1 cup", "why_it_fits": "Low calorie"}]},
+            "dinner": {"options": [{"name": "Dal Khichdi with Palak", "details": "1 bowl", "why_it_fits": "Easy digestion"}]},
+        }
+
+        # Create user & profile to verify profile context is passed to AI
+        signup = self.client.post(
+            "/api/auth/signup",
+            data={"username": "vegan_athlete", "email": "vegan@nutri.ai", "password": "VeganPass@123"},
+            content_type="application/json",
+        ).json()
+        user_id = signup["user"]["id"]
+        owner_id = signup["user"]["owner_id"]
+        token = signup["token"]
+
+        self.client.post(
+            "/api/profile",
+            data={"name": "Priya", "age": 25, "allergies": "Soy", "bio": "Endurance cyclist"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+
+        resp = self.client.post(
+            "/api/nutrition/meal-plans/generate",
+            data={
+                "preferences": ["High-protein", "Blood-sugar conscious"],
+                "duration": "weekly",
+                "diet_type": "vegan",
+                "custom_request": "Include South Indian breakfast options",
+                "owner_id": owner_id,
+                "user_id": user_id,
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["duration"], "weekly")
+        self.assertEqual(body["diet_type"], "vegan")
+        self.assertEqual(body["plan"]["duration"], "weekly")
+        self.assertEqual(body["plan"]["diet_type"], "vegan")
+        for sec in ("breakfast", "lunch", "snacks", "dinner"):
+            self.assertGreaterEqual(len(body["plan"][sec]["options"]), 5)
+
+        # Verify prompt sent to LLM included duration, diet_type, and user profile allergies
+        call_kwargs = mock_gen.call_args.kwargs
+        user_prompt = call_kwargs["user_prompt"]
+        self.assertIn("7-day", user_prompt)
+        self.assertIn("100% Vegan", user_prompt)
+        self.assertIn("Soy", user_prompt)
+
+    @patch("nutrition.services.llama_client.LlamaCppClient.transcribe_audio", return_value="I want a monthly eggetarian diet for muscle gain")
+    @patch("nutrition.services.llama_client.LlamaCppClient.generate_structured_response")
+    def test_meal_plan_multimodal_upload_endpoint_with_voice_and_image(self, mock_gen, mock_transcribe):
+        mock_gen.return_value = {
+            "summary": "Monthly Eggetarian Plan",
+            "breakfast": {"options": [{"name": "Masala Omelette", "details": "3 eggs", "why_it_fits": "High protein"}]},
+            "lunch": {"options": [{"name": "Egg Curry & Roti", "details": "2 eggs, 2 rotis", "why_it_fits": "Balanced macros"}]},
+            "snacks": {"options": [{"name": "Boiled Egg Whites", "details": "3 whites", "why_it_fits": "Lean protein"}]},
+            "dinner": {"options": [{"name": "Bhurji & Dal", "details": "1 bowl", "why_it_fits": "Sustained release"}]},
+        }
+
+        fake_image = SimpleUploadedFile("fridge.jpg", b"\xff\xd8\xff\xe0fakejpeg", content_type="image/jpeg")
+        fake_voice = SimpleUploadedFile("request.wav", b"RIFFfakewav", content_type="audio/wav")
+
+        resp = self.client.post(
+            "/api/nutrition/meal-plans/generate/upload",
+            data={
+                "preferences": json.dumps(["High-protein"]),
+                "duration": "monthly",
+                "diet_type": "egg",
+                "custom_request": "Use ingredients in photo",
+                "image": fake_image,
+                "voice": fake_voice,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["duration"], "monthly")
+        self.assertEqual(data["diet_type"], "egg")
+        self.assertEqual(data["transcription"], "I want a monthly eggetarian diet for muscle gain")
+        self.assertEqual(data["plan"]["has_image"], True)
+        for sec in ("breakfast", "lunch", "snacks", "dinner"):
+            self.assertGreaterEqual(len(data["plan"][sec]["options"]), 10)
+
+
+class WebFrontendTemplatesTests(SimpleTestCase):
+    def test_frontend_templates_render_all_upgraded_views(self):
+        from web_frontend.server import build_page_context, render_template
+
+        # 1. Auth page (Login / Signup + Strong Password Meter)
+        auth_ctx = build_page_context("/login", auth_mode="login")
+        auth_html = render_template("pages/auth.html", auth_ctx)
+        self.assertIn("Create Account", auth_html)
+        self.assertIn("login-form", auth_html)
+        self.assertIn("signup-form", auth_html)
+        self.assertIn("password-strength-bars", auth_html)
+        self.assertIn("generate-strong-password-btn", auth_html)
+
+        # 2. Unauthenticated Profile & Groups pages show Auth Gate and disable submission
+        unauth_profile_html = render_template("pages/profile.html", build_page_context("/profile"))
+        self.assertIn("profile-auth-gate", unauth_profile_html)
+        self.assertIn("Please log in or sign up to create your profile", unauth_profile_html)
+        self.assertNotIn('id="profile-save-btn"', unauth_profile_html)
+
+        unauth_groups_html = render_template("pages/groups.html", build_page_context("/groups"))
+        self.assertIn("groups-auth-gate", unauth_groups_html)
+        self.assertIn("Log in or sign up to create or join a nutrition group", unauth_groups_html)
+        self.assertIn('id="open-create-group-modal-btn"', unauth_groups_html)
+        self.assertIn('disabled', unauth_groups_html)
+        self.assertIn('cursor-not-allowed', unauth_groups_html)
+        self.assertIn('Log in or sign up to create a group', unauth_groups_html)
+
+        # 3. Authenticated Profile & Groups pages show Profile Picture Upload + Group Modals
+        mock_user = {"username": "alice", "email": "alice@nutri.ai", "profile": {"name": "Alice"}}
+        profile_ctx = build_page_context("/profile", current_user=mock_user)
+        profile_html = render_template("pages/profile.html", profile_ctx)
+        self.assertIn("profile-avatar-file", profile_html)
+        self.assertIn("allergies", profile_html)
+        self.assertIn("height", profile_html)
+        self.assertIn("weight", profile_html)
+        self.assertIn("gender", profile_html)
+
+        groups_ctx = build_page_context("/groups", current_user=mock_user)
+        groups_html = render_template("pages/groups.html", groups_ctx)
+        self.assertIn("create-group-modal", groups_html)
+        self.assertIn("group-detail-modal", groups_html)
+        self.assertIn("public-groups-search", groups_html)
+
+        # 4. Tracker page (Daily / Weekly / Monthly tabs + Complete Nutrient Breakdown)
+        tracker_ctx = build_page_context("/tracker", current_user=mock_user)
+        tracker_html = render_template("pages/tracker.html", tracker_ctx)
+        self.assertIn('data-tracker-tab="daily"', tracker_html)
+        self.assertIn('data-tracker-tab="weekly"', tracker_html)
+        self.assertIn('data-tracker-tab="monthly"', tracker_html)
+        self.assertIn("Macronutrients", tracker_html)
+        self.assertIn("Vitamins", tracker_html)
+        self.assertIn("Minerals", tracker_html)
+
+        # 5. Meal Plan page
+        meal_ctx = build_page_context("/meal-plan", current_user=mock_user)
+        meal_html = render_template("pages/meal_plan.html", meal_ctx)
+        for duration_val in ("daily", "weekly", "monthly"):
+            self.assertIn(f'value="{duration_val}"', meal_html)
+        for diet_val in ("veg", "non-veg", "vegan", "egg"):
+            self.assertIn(f'value="{diet_val}"', meal_html)
+        self.assertIn("meal-plan-mic-btn", meal_html)
+        self.assertIn("meal-plan-image", meal_html)
+        self.assertIn("meal-plan-voice", meal_html)
+        self.assertIn("meal-section-card", meal_html)
+
+

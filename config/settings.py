@@ -30,9 +30,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'nutrition',
+    'chat_history.apps.ChatHistoryConfig',
 ]
 
 MIDDLEWARE = [
+    'config.cors.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -40,6 +42,15 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        'CORS_ALLOWED_ORIGINS',
+        'http://127.0.0.1:5500,http://localhost:5500',
+    ).split(',')
+    if origin.strip()
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -61,15 +72,93 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'nutrition': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
 
 # Database
+# 'default' / 'core_app' (core_app.sqlite3) is the primary application database storing
+# all application tables: auth, sessions, admin, contenttypes, user profiles, nutrition groups,
+# tracker, chat history, meal plans, and all future tables.
+# 'nutrition' (db.sqlite3) is strictly a read-only cache database containing ONLY IFCT 2017
+# reference data inside the container.
+
+CORE_APP_DB_ENGINE = os.getenv(
+    'CORE_APP_DB_ENGINE',
+    os.getenv('CHAT_HISTORY_DB_ENGINE', 'django.db.backends.sqlite3'),
+)
+CORE_APP_DB_NAME = os.getenv(
+    'CORE_APP_DB_NAME',
+    os.getenv('CHAT_HISTORY_DB_NAME', str(BASE_DIR / 'core_app.sqlite3')),
+)
+if (
+    CORE_APP_DB_ENGINE == 'django.db.backends.sqlite3'
+    and not Path(CORE_APP_DB_NAME).is_absolute()
+):
+    CORE_APP_DB_NAME = str(BASE_DIR / CORE_APP_DB_NAME)
+
+NUTRITION_DB_ENGINE = os.getenv(
+    'NUTRITION_DB_ENGINE', 'django.db.backends.sqlite3'
+)
+NUTRITION_DB_NAME = os.getenv(
+    'NUTRITION_DB_NAME', str(BASE_DIR / 'db.sqlite3')
+)
+if (
+    NUTRITION_DB_ENGINE == 'django.db.backends.sqlite3'
+    and not Path(NUTRITION_DB_NAME).is_absolute()
+):
+    NUTRITION_DB_NAME = str(BASE_DIR / NUTRITION_DB_NAME)
+
+CORE_APP_CONFIG = {
+    'ENGINE': CORE_APP_DB_ENGINE,
+    'NAME': CORE_APP_DB_NAME,
+    'USER': os.getenv('CORE_APP_DB_USER', os.getenv('CHAT_HISTORY_DB_USER', '')),
+    'PASSWORD': os.getenv('CORE_APP_DB_PASSWORD', os.getenv('CHAT_HISTORY_DB_PASSWORD', '')),
+    'HOST': os.getenv('CORE_APP_DB_HOST', os.getenv('CHAT_HISTORY_DB_HOST', '')),
+    'PORT': os.getenv('CORE_APP_DB_PORT', os.getenv('CHAT_HISTORY_DB_PORT', '')),
+}
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+        'ENGINE': CORE_APP_DB_ENGINE,
+        'NAME': CORE_APP_DB_NAME,
+        'USER': os.getenv('CORE_APP_DB_USER', os.getenv('CHAT_HISTORY_DB_USER', '')),
+        'PASSWORD': os.getenv('CORE_APP_DB_PASSWORD', os.getenv('CHAT_HISTORY_DB_PASSWORD', '')),
+        'HOST': os.getenv('CORE_APP_DB_HOST', os.getenv('CHAT_HISTORY_DB_HOST', '')),
+        'PORT': os.getenv('CORE_APP_DB_PORT', os.getenv('CHAT_HISTORY_DB_PORT', '')),
+    },
+    'nutrition': {
+        'ENGINE': NUTRITION_DB_ENGINE,
+        'NAME': NUTRITION_DB_NAME,
+    },
 }
+DATABASE_ROUTERS = ['chat_history.db_router.CoreAppDatabaseRouter']
+MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
+MEDIA_ROOT = Path(
+    os.getenv(
+        'CORE_APP_MEDIA_ROOT',
+        os.getenv('CHAT_HISTORY_MEDIA_ROOT', str(BASE_DIR / 'media')),
+    )
+)
 
 
 # Password validation

@@ -107,6 +107,7 @@ def run_nutrition_workflow(
         "audio_format": audio_format,
         "dish_name": None,
         "recognized_input_summary": None,
+        "ai_generated_response": None,
         "identified_ingredients": [],
         "detected_food_items": [],
         "nutrient_analysis": None,

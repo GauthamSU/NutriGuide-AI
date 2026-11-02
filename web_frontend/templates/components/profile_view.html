@@ -1,0 +1,218 @@
+{% set p = current_user or {} %}
+<main class="page-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-8" data-page="profile">
+  <div class="mx-auto max-w-[1120px]">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="section-eyebrow">Personal Biometrics & Dietary Context</p>
+        <h1 class="serif mb-2 text-[32px] leading-tight sm:text-[38px]">Your Nutrition Profile</h1>
+        <p class="max-w-2xl text-sm leading-relaxed text-[#6d7871]">Keep your display picture, personal details, body metrics, allergies, and bio up to date so NutriGuide can tailor meal plans and nutritional insights to you.</p>
+      </div>
+      {% if not current_user %}
+        <div class="flex items-center gap-2">
+          <a href="/login" class="btn-secondary">Log in</a>
+          <a href="/signup" class="btn-primary">Create Account →</a>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if not current_user %}
+      <div id="profile-auth-gate" class="panel panel-padded mb-6 border-[#f3d2c8] bg-[#fff9f7]" role="alert">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-start gap-3.5">
+            <span class="feature-icon !bg-[#fdf0ec] !text-[#9d4534]" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <div>
+              <p class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#9d4534]">Authentication Required</p>
+              <h2 class="serif m-0 mt-0.5 text-xl text-[#173c2c]">Please log in or sign up to create your profile</h2>
+              <p class="m-0 mt-1 text-xs leading-relaxed text-[#53645a]">Profile creation and saving (including display picture, biometrics, and allergies) are unlocked once you sign in to your NutriGuide account.</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <a href="/login" class="btn-secondary">Log In</a>
+            <a href="/signup" class="btn-primary">Create Account (Sign Up) →</a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="profile-layout">
+      <!-- Profile Form -->
+      <section class="panel panel-padded">
+        <div class="mb-5 flex items-center justify-between border-b border-[#e3e7df] pb-4">
+          <div>
+            <h2 class="serif m-0 text-2xl">Personal & Health Details</h2>
+            <p class="m-0 mt-1 text-xs text-[#6d7871]">All fields are used to personalize your meal plans and allergy warnings.</p>
+          </div>
+          {% if p.username %}
+            <span class="badge-pill badge-green">@{{ p.username }}</span>
+          {% else %}
+            <span class="badge-pill badge-coral">Sign in required</span>
+          {% endif %}
+        </div>
+
+        <p id="profile-feedback" class="hidden mb-5 rounded-lg border p-3.5 text-sm" role="alert"></p>
+
+        <form id="profile-form" novalidate data-authenticated="{{ 'true' if current_user else 'false' }}">
+          <input type="hidden" name="owner_id" value="{{ owner_id }}">
+          <input type="hidden" name="profile_picture" id="profile-picture-data" value="{{ p.profile_picture or '' }}">
+
+          <fieldset {% if not current_user %}disabled class="m-0 border-0 p-0 opacity-50 pointer-events-none select-none"{% else %}class="m-0 border-0 p-0"{% endif %}>
+            <!-- Profile Picture / Display Picture Upload -->
+            <div class="mb-6 rounded-xl border border-[#dfe6dc] bg-[#fbfcf9] p-4">
+              <span class="form-label !mb-2">Profile / Display Picture</span>
+              <div class="flex flex-wrap items-center gap-4">
+                <div id="profile-avatar-preview" class="profile-avatar-lg !h-16 !w-16 overflow-hidden border-2 border-[#c6dac9] shadow-sm">
+                  {% if p.profile_picture %}
+                    <img id="profile-avatar-preview-img" src="{{ p.profile_picture }}" alt="Profile picture preview" class="h-full w-full object-cover">
+                  {% else %}
+                    <span id="profile-avatar-preview-initial">{{ (p.name or p.username or "N")[0]|upper }}</span>
+                  {% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label for="profile-avatar-file" class="btn-secondary !py-1.5 !px-3.5 !text-xs cursor-pointer">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Upload Display Picture</span>
+                    </label>
+                    <input id="profile-avatar-file" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only">
+                    <button type="button" id="profile-remove-avatar-btn" class="btn-secondary !py-1.5 !px-3 !text-xs text-[#9d4534] {% if not p.profile_picture %}hidden{% endif %}">
+                      Remove Picture
+                    </button>
+                  </div>
+                  <span class="form-hint">Supports JPG, PNG, or WebP. Shown on your profile, top bar, and nutrition groups.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid-2 mb-4">
+              <div>
+                <label for="profile-name" class="form-label">Full Name</label>
+                <input id="profile-name" name="name" type="text" maxlength="150" value="{{ p.name or '' }}" placeholder="e.g. Ananya Rao" class="form-input">
+              </div>
+              <div>
+                <label for="profile-gender" class="form-label">Gender</label>
+                <select id="profile-gender" name="gender" class="form-input">
+                  {% set cur_gender = (p.gender or '')|lower %}
+                  <option value="" {% if not cur_gender %}selected{% endif %}>Select gender…</option>
+                  <option value="Female" {% if cur_gender == 'female' %}selected{% endif %}>Female</option>
+                  <option value="Male" {% if cur_gender == 'male' %}selected{% endif %}>Male</option>
+                  <option value="Non-binary" {% if cur_gender == 'non-binary' %}selected{% endif %}>Non-binary</option>
+                  <option value="Other" {% if cur_gender == 'other' %}selected{% endif %}>Other</option>
+                  <option value="Prefer not to say" {% if cur_gender in ['prefer not to say', 'prefer_not_to_say'] %}selected{% endif %}>Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-3 mb-5">
+              <div>
+                <label for="profile-age" class="form-label">Age (years)</label>
+                <input id="profile-age" name="age" type="number" min="1" max="130" step="1" value="{{ p.age if p.age is not none else '' }}" placeholder="e.g. 28" class="form-input">
+              </div>
+              <div>
+                <label for="profile-height" class="form-label">Height (cm)</label>
+                <input id="profile-height" name="height_cm" type="number" min="30" max="300" step="0.1" value="{{ p.height_cm if p.height_cm is not none else '' }}" placeholder="e.g. 168" class="form-input">
+              </div>
+              <div>
+                <label for="profile-weight" class="form-label">Weight (kg)</label>
+                <input id="profile-weight" name="weight_kg" type="number" min="2" max="500" step="0.1" value="{{ p.weight_kg if p.weight_kg is not none else '' }}" placeholder="e.g. 64.5" class="form-input">
+              </div>
+            </div>
+
+            <div class="mb-5">
+              <label for="profile-allergies" class="form-label">Allergies & Dietary Intolerances</label>
+              <input id="profile-allergies" name="allergies" type="text" maxlength="2000" value="{{ p.allergies or '' }}" placeholder="e.g. Peanuts, Shellfish, Lactose, Gluten" class="form-input">
+              <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <span class="text-[11px] font-semibold text-[#6d7871]">Quick add:</span>
+                {% for allergen in ["Peanuts", "Tree nuts", "Dairy / Lactose", "Gluten", "Soy", "Egg", "Shellfish", "Sesame"] %}
+                  <button type="button" class="allergy-quick-chip" data-allergen="{{ allergen }}">+ {{ allergen }}</button>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="mb-5">
+              <label for="profile-bio" class="form-label">General Bio & Nutrition Goals</label>
+              <textarea id="profile-bio" name="bio" rows="4" maxlength="3000" placeholder="Tell us a bit about yourself, your daily routine, regional cuisine preferences, or fitness goals…" class="form-input resize-y">{{ p.bio or '' }}</textarea>
+            </div>
+          </fieldset>
+
+          <div class="form-actions-bar">
+            <p class="m-0 text-xs text-[#6d7871]">Saved allergies and goals are automatically included when generating meal plans.</p>
+            {% if current_user %}
+              <button type="submit" id="profile-save-btn" class="btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Save Profile</span>
+              </button>
+            {% else %}
+              <a href="/login" class="btn-primary">
+                <span>Log In to Create Profile →</span>
+              </a>
+            {% endif %}
+          </div>
+        </form>
+      </section>
+
+      <!-- Live Profile Summary Card -->
+      <aside class="panel panel-padded bg-[#fbfcf9]">
+        <div class="mb-4 flex items-center gap-3.5 border-b border-[#e3e7df] pb-4">
+          <span id="summary-avatar" class="profile-avatar-lg overflow-hidden">
+            {% if p.profile_picture %}
+              <img id="summary-avatar-img" src="{{ p.profile_picture }}" alt="{{ p.name or p.username or 'Profile' }}" class="h-full w-full object-cover">
+            {% else %}
+              <span id="summary-avatar-initial">{{ (p.name or p.username or "N")[0]|upper }}</span>
+            {% endif %}
+          </span>
+          <div class="min-w-0">
+            <h2 id="summary-name" class="serif m-0 truncate text-2xl text-[#173c2c]">{{ p.name or p.username or "Guest Visitor" }}</h2>
+            <p id="summary-account" class="m-0 text-xs text-[#6d7871]">
+              {% if p.username %}@{{ p.username }}{% if p.email %} · {{ p.email }}{% endif %}{% else %}Not signed in — log in to create your profile{% endif %}
+            </p>
+          </div>
+        </div>
+
+        <div class="stat-grid-2 mb-4">
+          <div class="stat-mini-card">
+            <span class="stat-mini-label">Age / Gender</span>
+            <strong id="summary-age-gender" class="stat-mini-value">
+              {% if p.age or p.gender %}{{ p.age ~ ' yrs' if p.age else '—' }}{% if p.gender %} · {{ p.gender }}{% endif %}{% else %}Not set{% endif %}
+            </strong>
+          </div>
+          <div class="stat-mini-card">
+            <span class="stat-mini-label">Height / Weight</span>
+            <strong id="summary-height-weight" class="stat-mini-value">
+              {% if p.height_cm or p.weight_kg %}{{ p.height_cm ~ ' cm' if p.height_cm else '—' }} / {{ p.weight_kg ~ ' kg' if p.weight_kg else '—' }}{% else %}Not set{% endif %}
+            </strong>
+          </div>
+        </div>
+
+        <div class="stat-mini-card mb-4">
+          <div class="flex items-center justify-between">
+            <span class="stat-mini-label">Body Mass Index (BMI)</span>
+            <span id="summary-bmi-badge" class="badge-pill badge-green">{{ p.bmi_category or "Enter height & weight" }}</span>
+          </div>
+          <p id="summary-bmi-value" class="serif m-0 mt-1 text-3xl text-[#173c2c]">{{ p.bmi if p.bmi else "—" }}</p>
+        </div>
+
+        <div class="mb-4">
+          <p class="mb-2 text-[11px] font-bold uppercase tracking-[0.8px] text-[#6d7871]">Recorded Allergies</p>
+          <div id="summary-allergies" class="flex flex-wrap gap-1.5">
+            {% if p.allergies_list %}
+              {% for item in p.allergies_list %}
+                <span class="badge-pill badge-coral">{{ item }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="text-xs text-[#89938c]">No allergies listed</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div>
+          <p class="mb-1.5 text-[11px] font-bold uppercase tracking-[0.8px] text-[#6d7871]">About / Bio</p>
+          <p id="summary-bio" class="m-0 rounded-lg border border-[#e3e7df] bg-white p-3 text-xs leading-relaxed text-[#53645a]">
+            {{ p.bio or "Add a short bio about your food preferences, lifestyle, or health goals." }}
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>

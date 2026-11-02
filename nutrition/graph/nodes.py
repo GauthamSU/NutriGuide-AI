@@ -14,6 +14,14 @@ from nutrition.services.llama_client import LlamaCppClient
 logger = logging.getLogger(__name__)
 
 
+def _normalize_string_list(value: Any) -> List[str]:
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        return [str(item) for item in value if item is not None and str(item).strip()]
+    return []
+
+
 def validate_input_node(state: NutriGuideState) -> Dict[str, Any]:
     """
     Node 1: Validates incoming multimodal inputs (text, image, voice) and
@@ -100,8 +108,23 @@ def identify_dish_node(state: NutriGuideState) -> Dict[str, Any]:
                 "database_food_name": item.get("database_food_name"),
             })
 
-        dietary_tags = list(raw_result.get("dietary_tags") or [])
-        health_insights = list(raw_result.get("health_insights") or [])
+        dietary_tags = _normalize_string_list(raw_result.get("dietary_tags"))
+        health_insights = _normalize_string_list(raw_result.get("health_insights"))
+        ai_generated_response = {
+            "dish_name": dish_name,
+            "recognized_input_summary": summary,
+            "ingredients": [
+                {
+                    "ingredient_name": item["ingredient_name"],
+                    "serving_size_description": item["serving_size_description"],
+                    "estimated_weight_grams": item["estimated_weight_grams"],
+                    "confidence": item["confidence"],
+                }
+                for item in normalized_ingredients
+            ],
+            "dietary_tags": dietary_tags,
+            "health_insights": health_insights,
+        }
 
         # If input was already a pre-computed full analysis dict (e.g. legacy tests)
         already_analyzed = None
@@ -111,6 +134,7 @@ def identify_dish_node(state: NutriGuideState) -> Dict[str, Any]:
         return {
             "dish_name": dish_name,
             "recognized_input_summary": summary,
+            "ai_generated_response": ai_generated_response,
             "identified_ingredients": normalized_ingredients,
             "pending_ingredients": normalized_ingredients,
             "resolved_items": [],
@@ -209,6 +233,7 @@ def resolve_database_nutrients_node(state: NutriGuideState) -> Dict[str, Any]:
         macro_keys = [
             "calories_kcal", "protein_g", "carbohydrates_g", "dietary_fiber_g",
             "total_sugars_g", "added_sugars_g", "total_fat_g", "saturated_fat_g",
+            "monounsaturated_fat_g", "polyunsaturated_fat_g",
             "unsaturated_fat_g", "trans_fat_g", "cholesterol_mg", "sodium_mg", "water_g"
         ]
         for missing_item in all_final_unresolved:
@@ -237,8 +262,8 @@ def resolve_database_nutrients_node(state: NutriGuideState) -> Dict[str, Any]:
             for k in macro_keys:
                 total_macros[k] = round(total_macros[k] + macros.get(k, 0.0), 2)
 
-        dietary_warnings = list(state.get("dietary_warnings") or [])
-        health_insights = list(state.get("health_insights") or [])
+        dietary_warnings = _normalize_string_list(state.get("dietary_warnings"))
+        health_insights = _normalize_string_list(state.get("health_insights"))
 
         # Add decomposition history alerts
         for decomp in decomposition_history:
@@ -278,10 +303,26 @@ def resolve_database_nutrients_node(state: NutriGuideState) -> Dict[str, Any]:
             "health_insights": health_insights,
             "missing_ingredients": unresolved_names,
         }
+        ai_generated_response = dict(state.get("ai_generated_response") or {})
+        ai_generated_response.update({
+            "dish_name": dish_name,
+            "recognized_input_summary": summary,
+            "ingredients": [
+                {
+                    "ingredient_name": item["food_name"],
+                    "serving_size_description": item["serving_size_description"],
+                    "estimated_weight_grams": item["estimated_weight_grams"],
+                    "confidence": item["confidence"],
+                }
+                for item in final_items
+            ],
+            "dietary_tags": list(state.get("dietary_tags") or []),
+        })
 
         return {
             "detected_food_items": final_items,
             "nutrient_analysis": final_analysis,
+            "ai_generated_response": ai_generated_response,
             "missing_ingredients": unresolved_names,
             "dietary_warnings": dietary_warnings,
             "health_insights": health_insights,

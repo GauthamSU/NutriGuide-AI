@@ -1,0 +1,476 @@
+<main class="page-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-8" data-page="groups" data-authenticated="{{ 'true' if current_user else 'false' }}">
+  <div class="mx-auto max-w-[1280px]">
+    <!-- Page Header -->
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="section-eyebrow">Community & Collective Tracking</p>
+        <h1 class="serif mb-2 text-[32px] leading-tight sm:text-[38px]">Nutrition Groups</h1>
+        <p class="max-w-2xl text-sm leading-relaxed text-[#6d7871]">View your joined nutrition groups, search discoverable public groups, or create a new public or private group to track collective macros together.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2.5">
+        {% if current_user %}
+          <button type="button" id="open-create-group-modal-btn" data-open-create-group-modal class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Create New Group</span>
+          </button>
+        {% else %}
+          <button type="button" id="open-create-group-modal-btn" disabled class="btn-primary opacity-50 cursor-not-allowed" title="Log in or sign up to create a group" aria-disabled="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Create New Group</span>
+          </button>
+          <a href="/login" class="btn-secondary">Log in</a>
+          <a href="/signup" class="btn-primary">Sign Up →</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not current_user %}
+      <div id="groups-auth-gate" class="panel panel-padded mb-6 border-[#f3d2c8] bg-[#fff9f7]" role="alert">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-start gap-3.5">
+            <span class="feature-icon !bg-[#fdf0ec] !text-[#9d4534]" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <div>
+              <p class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#9d4534]">Authentication Required</p>
+              <h2 class="serif m-0 mt-0.5 text-xl text-[#173c2c]">Log in or sign up to create or join a nutrition group</h2>
+              <p class="m-0 mt-1 text-xs leading-relaxed text-[#53645a]">You can browse public groups below, but creating a group, joining a group, or logging collective meals requires an account.</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <a href="/login" class="btn-secondary">Log In</a>
+            <a href="/signup" class="btn-primary">Create Account →</a>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <p id="group-create-feedback" class="hidden mb-5 rounded-lg border p-3.5 text-sm" role="alert"></p>
+
+    <!-- ─── Group Invitations & Membership Requests Notifications ─── -->
+    <div id="group-notifications-container" class="mb-6 space-y-4 {% if not pending_invitations and not admin_pending_requests and not my_pending_join_requests %}hidden{% endif %}">
+      
+      <!-- 1. Incoming Invitations (User invited by Group Admin) -->
+      <div id="pending-invitations-card" class="rounded-2xl border border-[#cde0d1] bg-gradient-to-r from-[#f2f8f3] to-[#ffffff] p-5 shadow-sm {% if not pending_invitations %}hidden{% endif %}">
+        <div class="flex items-center gap-2 mb-2.5">
+          <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#245c43] text-white">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </span>
+          <h2 class="serif m-0 text-xl text-[#173c2c]">Group Invitations (<span id="invitations-count">{{ (pending_invitations or [])|length }}</span>)</h2>
+          <span class="badge-pill badge-green text-[10px]">Action Required</span>
+        </div>
+        <p class="m-0 mb-3.5 text-xs text-[#53645a]">You have been invited to join the following nutrition groups. You have full ownership to accept or decline:</p>
+        <div id="pending-invitations-list" class="space-y-2.5">
+          {% for inv in pending_invitations or [] %}
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d5ded4] bg-white p-3.5 shadow-sm" data-request-card-id="{{ inv.id }}">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <strong class="text-sm font-bold text-[#173c2c]">{{ inv.group_name }}</strong>
+                  <span class="badge-pill {{ 'badge-green' if inv.group_is_public else 'badge-amber' }} !py-0.5 !px-2 !text-[10px]">
+                    {{ 'Public' if inv.group_is_public else 'Private' }}
+                  </span>
+                </div>
+                <p class="m-0 mt-0.5 text-xs text-[#6d7871]">
+                  Invited by <strong class="text-[#245c43]">@{{ inv.created_by_username }}</strong> · {{ inv.created_at[:10] if inv.created_at else 'Recently' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn-primary !py-1.5 !px-3.5 !text-xs" data-request-action="accept" data-request-id="{{ inv.id }}">
+                  ✓ Accept Invitation
+                </button>
+                <button type="button" class="btn-secondary !py-1.5 !px-3 !text-xs text-[#9d4534] hover:bg-[#fff0ed]" data-request-action="reject" data-request-id="{{ inv.id }}">
+                  ✕ Decline
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 2. Admin Pending Join Requests (Users requested to join groups managed by current user) -->
+      <div id="admin-requests-card" class="rounded-2xl border border-[#d3ddf2] bg-gradient-to-r from-[#f2f6fc] to-[#ffffff] p-5 shadow-sm {% if not admin_pending_requests %}hidden{% endif %}">
+        <div class="flex items-center gap-2 mb-2.5">
+          <span class="grid h-7 w-7 place-items-center rounded-lg bg-[#27538a] text-white">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 11h-6"/></svg>
+          </span>
+          <h2 class="serif m-0 text-xl text-[#173c2c]">Join Requests for Your Groups (<span id="admin-requests-count">{{ (admin_pending_requests or [])|length }}</span>)</h2>
+          <span class="badge-pill badge-blue text-[10px]">Admin Review</span>
+        </div>
+        <p class="m-0 mb-3.5 text-xs text-[#53645a]">Users have requested to join groups you manage. As admin, approve or reject each request:</p>
+        <div id="admin-requests-list" class="space-y-2.5">
+          {% for req in admin_pending_requests or [] %}
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c8d6ea] bg-white p-3.5 shadow-sm" data-request-card-id="{{ req.id }}">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <strong class="text-sm font-bold text-[#173c2c]">@{{ req.username }}</strong>
+                  <span class="text-xs text-[#6d7871]">wants to join <strong class="text-[#245c43]">{{ req.group_name }}</strong></span>
+                </div>
+                <p class="m-0 mt-0.5 text-xs text-[#6d7871]">
+                  Requested on {{ req.created_at[:10] if req.created_at else 'Recently' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn-primary !py-1.5 !px-3.5 !text-xs !bg-[#27538a] hover:!bg-[#1c406d]" data-request-action="accept" data-request-id="{{ req.id }}">
+                  ✓ Approve
+                </button>
+                <button type="button" class="btn-secondary !py-1.5 !px-3 !text-xs text-[#9d4534] hover:bg-[#fff0ed]" data-request-action="reject" data-request-id="{{ req.id }}">
+                  ✕ Reject
+                </button>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 3. Sent Join Requests (User waiting for Admin Approval) -->
+      <div id="my-sent-requests-card" class="rounded-2xl border border-[#e4e7e0] bg-[#fafbf9] p-4 {% if not my_pending_join_requests %}hidden{% endif %}">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <h3 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#6d7871]">Sent Join Requests (Waiting for Admin Approval)</h3>
+          <span class="text-xs text-[#6d7871]"><span id="my-sent-requests-count">{{ (my_pending_join_requests or [])|length }}</span> pending</span>
+        </div>
+        <div id="my-sent-requests-list" class="space-y-2">
+          {% for sreq in my_pending_join_requests or [] %}
+            <div class="flex items-center justify-between gap-2 rounded-lg border border-[#e0e4dc] bg-white px-3 py-2 text-xs" data-request-card-id="{{ sreq.id }}">
+              <div>
+                <span>Requested to join <strong class="text-[#173c2c]">{{ sreq.group_name }}</strong></span>
+                <span class="badge-pill badge-amber !py-0.2 !px-1.5 !text-[10px] ml-2">Under Admin Review</span>
+              </div>
+              <button type="button" class="btn-secondary !py-1 !px-2.5 !text-[11px] text-[#9d4534] hover:bg-[#fff0ed]" data-request-action="cancel" data-request-id="{{ sreq.id }}">
+                Cancel Request
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="groups-top-grid mb-8">
+      <!-- 1. User's Joined Groups Section -->
+      <section class="panel panel-padded">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#e3e7df] pb-3.5">
+          <div>
+            <p class="section-eyebrow !mb-1">Your Memberships</p>
+            <h2 class="serif m-0 text-2xl">Joined Groups (<span id="my-groups-count">{{ (my_groups or [])|length }}</span>)</h2>
+          </div>
+          {% if current_user %}
+            <button type="button" data-open-create-group-modal class="btn-secondary !py-1.5 !px-3 !text-xs">
+              + Create Group
+            </button>
+          {% else %}
+            <button type="button" disabled class="btn-secondary !py-1.5 !px-3 !text-xs opacity-50 cursor-not-allowed" title="Log in or sign up to create a group" aria-disabled="true">
+              + Create Group
+            </button>
+          {% endif %}
+        </div>
+
+        <div id="my-groups-list" class="group-directory-list">
+          {% if my_groups %}
+            {% for grp in my_groups %}
+              <div class="group-list-card" data-group-card-id="{{ grp.id }}">
+                <div class="min-w-0 flex-1">
+                  <div class="mb-1 flex flex-wrap items-center gap-1.5">
+                    <strong class="truncate text-sm font-bold text-[#173c2c]">{{ grp.name }}</strong>
+                    <span class="badge-pill {{ 'badge-green' if grp.is_public else 'badge-amber' }} !py-0.5 !px-2 !text-[10px]">
+                      {{ 'Public' if grp.is_public else 'Private' }}
+                    </span>
+                  </div>
+                  <p class="m-0 truncate text-xs text-[#6d7871]">{{ grp.description or 'Shared collective nutrition group' }}</p>
+                  <p class="m-0 mt-1 text-[11px] font-semibold text-[#245c43]">
+                    {{ grp.member_count }} {{ 'member' if grp.member_count == 1 else 'members' }} · {{ "%.0f"|format(grp.total_calories_kcal or 0) }} kcal · {{ "%.1f"|format(grp.total_protein_g or 0) }}g protein
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" class="btn-primary !py-1.5 !px-3.5 !text-xs" data-open-group-id="{{ grp.id }}">
+                    View Details →
+                  </button>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="rounded-xl border border-dashed border-[#cbd6cc] bg-[#fbfcf9] p-6 text-center">
+              <div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-[#e6efe7] text-[#245c43]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+              </div>
+              <h3 class="serif m-0 mb-1 text-lg text-[#173c2c]">You haven't joined any groups yet</h3>
+              <p class="mx-auto mb-4 max-w-sm text-xs leading-relaxed text-[#6d7871]">
+                Create a new private or public group for your family, friends, or fitness team, or search for an existing public group to join!
+              </p>
+              <div class="group-empty-state-actions">
+                {% if current_user %}
+                  <button type="button" data-open-create-group-modal class="btn-primary !py-2 !px-4 !text-xs">
+                    + Create a Group
+                  </button>
+                {% else %}
+                  <button type="button" disabled class="btn-primary !py-2 !px-4 !text-xs opacity-50 cursor-not-allowed" title="Log in or sign up to create a group" aria-disabled="true">
+                    + Create a Group
+                  </button>
+                  <a href="/login" class="btn-secondary !py-2 !px-3 !text-xs">Log In to Unlock</a>
+                {% endif %}
+                <button type="button" id="focus-public-search-btn" class="btn-secondary !py-2 !px-4 !text-xs">
+                  Search Public Groups →
+                </button>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- 2. Discover & Search Public Groups Section -->
+      <section class="panel panel-padded bg-[#fbfcf9]">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#e3e7df] pb-3.5">
+          <div>
+            <p class="section-eyebrow !mb-1">Community Directory</p>
+            <h2 class="serif m-0 text-2xl">Top Public Groups (<span id="public-groups-count">{{ (public_groups or [])|length }}</span>)</h2>
+          </div>
+          <span class="badge-pill badge-green">Top 3 by Members</span>
+        </div>
+
+        <!-- Search Public Groups Input -->
+        <div class="mb-4 flex items-center gap-2">
+          <div class="relative flex-1">
+            <input id="public-groups-search" type="search" placeholder="Search public groups by name or goal…" class="form-input !bg-white !py-2 !pl-9 !text-xs" aria-label="Search public groups">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6d7871" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <button type="button" id="public-groups-search-btn" class="btn-secondary !py-2 !px-3.5 !text-xs">
+            Search
+          </button>
+        </div>
+
+        <p id="groups-directory-status" class="m-0 py-1 text-xs text-[#6d7871] {% if public_groups or my_groups %}hidden{% endif %}"></p>
+
+        <div id="public-groups-list" class="group-directory-list">
+          {% if public_groups %}
+            {% for grp in public_groups %}
+              <div class="group-list-card" data-group-card-id="{{ grp.id }}">
+                <div class="min-w-0 flex-1">
+                  <div class="mb-1 flex flex-wrap items-center gap-1.5">
+                    <strong class="truncate text-sm font-bold text-[#173c2c]">{{ grp.name }}</strong>
+                    <span class="badge-pill badge-green !py-0.5 !px-2 !text-[10px]">Public</span>
+                    {% if grp.is_member %}
+                      <span class="badge-pill badge-blue !py-0.5 !px-2 !text-[10px]">Joined</span>
+                    {% endif %}
+                  </div>
+                  <p class="m-0 truncate text-xs text-[#6d7871]">{{ grp.description or 'Shared collective nutrition group' }}</p>
+                  <p class="m-0 mt-1 text-[11px] font-semibold text-[#245c43]">
+                    {{ grp.member_count }} {{ 'member' if grp.member_count == 1 else 'members' }} · {{ "%.0f"|format(grp.total_calories_kcal or 0) }} kcal · {{ "%.1f"|format(grp.total_protein_g or 0) }}g protein
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  {% if not grp.is_member %}
+                    <button type="button" class="btn-secondary !py-1.5 !px-3 !text-xs" data-join-group-id="{{ grp.id }}">Join</button>
+                  {% endif %}
+                  <button type="button" class="btn-primary !py-1.5 !px-3 !text-xs" data-open-group-id="{{ grp.id }}">Open →</button>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <p class="m-0 rounded-lg border border-dashed border-[#d5ded4] p-5 text-center text-xs text-[#748078]">
+              No public groups found yet. Click <strong>Create New Group</strong> to launch the first public community group!
+            </p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ─── MODAL 1: Create Nutrition Group Modal ───────────────────────────── -->
+  <div id="create-group-modal" class="app-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="create-group-modal-title">
+    <div class="app-modal-dialog max-w-[600px]">
+      <div class="mb-4 flex items-center justify-between border-b border-[#e3e7df] pb-3.5">
+        <div>
+          <p class="section-eyebrow !mb-1">Start a Group</p>
+          <h2 id="create-group-modal-title" class="serif m-0 text-2xl text-[#173c2c]">Create a Nutrition Group</h2>
+        </div>
+        <button type="button" data-close-modal="create-group-modal" class="icon-button !h-8 !w-8" aria-label="Close modal">✕</button>
+      </div>
+
+      <form id="create-group-form" novalidate>
+        <input type="hidden" name="owner_id" value="{{ owner_id }}">
+        <fieldset {% if not current_user %}disabled class="m-0 border-0 p-0 opacity-50 pointer-events-none"{% else %}class="m-0 border-0 p-0"{% endif %}>
+          <div class="mb-4">
+            <span class="form-label">Group Visibility</span>
+            <div class="radio-tab-group" role="radiogroup" aria-label="Group visibility">
+              <label class="radio-tab-card is-selected" data-visibility-card>
+                <input type="radio" name="visibility" value="public" checked class="sr-only">
+                <span class="radio-tab-icon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </span>
+                <span>
+                  <strong class="block text-xs font-bold">Public Group</strong>
+                  <span class="block text-[11px] text-[#6d7871]">Unique group name · Anyone can join</span>
+                </span>
+              </label>
+              <label class="radio-tab-card" data-visibility-card>
+                <input type="radio" name="visibility" value="private" class="sr-only">
+                <span class="radio-tab-icon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
+                <span>
+                  <strong class="block text-xs font-bold">Private Group</strong>
+                  <span class="block text-[11px] text-[#6d7871]">Invite-only · Visible to members</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label for="group-name-input" class="form-label">Group Name <span class="text-[#c65a42]">*</span></label>
+            <input id="group-name-input" name="name" type="text" required maxlength="120" placeholder="e.g. Bangalore Runners Fuel or Sharma Family Kitchen" class="form-input">
+            <span id="group-name-hint" class="form-hint">Public group names must be unique across NutriGuide.</span>
+          </div>
+
+          <div class="mb-4">
+            <label for="group-desc-input" class="form-label">Group Description</label>
+            <textarea id="group-desc-input" name="description" rows="2" maxlength="2000" placeholder="Describe your group's shared nutrition goals, meal challenges, or household…" class="form-input resize-y"></textarea>
+          </div>
+
+          <div class="mb-5">
+            <label for="group-initial-members" class="form-label">Add Initial Members (optional)</label>
+            <input id="group-initial-members" name="member_identifiers" type="text" placeholder="Enter usernames or emails separated by commas (e.g. rohan, priya@example.com)" class="form-input">
+          </div>
+        </fieldset>
+
+        <div class="form-actions-bar">
+          <button type="button" data-close-modal="create-group-modal" class="btn-secondary">Cancel</button>
+          {% if current_user %}
+            <button type="submit" id="create-group-btn" class="btn-primary">
+              <span>Create Group</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          {% else %}
+            <button type="button" id="create-group-btn" disabled class="btn-primary opacity-50 cursor-not-allowed" title="Log in or sign up to create a group" aria-disabled="true">
+              <span>Create Group (Log In Required)</span>
+            </button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── MODAL 2: Group Detail & Collective Nutrition Modal ──────────────── -->
+  <div id="group-detail-modal" class="app-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="active-group-name">
+    <div id="group-dashboard-panel" class="app-modal-dialog max-w-[1040px]">
+      <div class="mb-5 flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e7df] pb-4">
+        <div class="min-w-0 flex-1">
+          <div class="mb-1.5 flex flex-wrap items-center gap-2">
+            <span id="active-group-badge" class="badge-pill badge-green">Public Group</span>
+            <span id="active-group-creator" class="text-xs text-[#6d7871]"></span>
+          </div>
+          <h2 id="active-group-name" class="serif m-0 text-3xl text-[#173c2c]">Group Name</h2>
+          <p id="active-group-description" class="m-0 mt-1 max-w-2xl text-sm leading-relaxed text-[#53645a]"></p>
+        </div>
+
+        <div class="group-detail-header-actions flex items-start gap-3 flex-shrink-0">
+          <!-- Add Member Form: card with centered + Add Member button -->
+          <form id="add-group-member-form" class="rounded-xl border border-[#dce2da] bg-[#f7f9f5] p-2 text-center">
+            <input type="hidden" name="group_id" id="active-group-id" value="">
+            <div class="flex flex-col items-center gap-1.5">
+              <input type="text" name="identifier" id="add-member-identifier" placeholder="Add member by username/email…" class="form-input !w-56 !bg-white !py-1.5 !text-xs text-center" required>
+              <button type="submit" id="add-member-submit-btn" class="btn-primary !py-1.5 !px-4 !text-xs !mx-auto">
+                <span>+ Add Member</span>
+              </button>
+            </div>
+          </form>
+          <button type="button" data-close-modal="group-detail-modal" class="icon-button !h-9 !w-9 flex-shrink-0 border border-[#dce2da] bg-white hover:bg-[#f2f7f1]" aria-label="Close group details modal">✕</button>
+        </div>
+      </div>
+
+      <p id="group-dashboard-feedback" class="hidden mb-5 rounded-lg border p-3.5 text-sm" role="alert"></p>
+
+      <!-- Collective Nutrition Hero Cards -->
+      <div class="mb-6">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="m-0 text-xs font-bold uppercase tracking-[1px] text-[#245c43]">Collective Group Nutrition Totals</h3>
+          <span id="collective-meals-summary" class="text-xs font-semibold text-[#6d7871]">0 meals tracked</span>
+        </div>
+        <div class="collective-stats-grid">
+          <div class="collective-stat-card collective-stat-primary">
+            <span class="collective-stat-label">Collective Calories</span>
+            <strong id="collective-calories" class="serif collective-stat-value">0 <small>kcal</small></strong>
+            <span id="collective-avg-calories" class="collective-stat-sub">0 kcal avg / member</span>
+          </div>
+          <div class="collective-stat-card">
+            <span class="collective-stat-label">Total Protein</span>
+            <strong id="collective-protein" class="serif collective-stat-value">0.0 <small>g</small></strong>
+            <span class="collective-stat-sub">Muscle & tissue repair</span>
+          </div>
+          <div class="collective-stat-card">
+            <span class="collective-stat-label">Total Carbohydrates</span>
+            <strong id="collective-carbs" class="serif collective-stat-value">0.0 <small>g</small></strong>
+            <span class="collective-stat-sub">Primary energy fuel</span>
+          </div>
+          <div class="collective-stat-card">
+            <span class="collective-stat-label">Total Fat</span>
+            <strong id="collective-fat" class="serif collective-stat-value">0.0 <small>g</small></strong>
+            <span class="collective-stat-sub">Essential fatty acids</span>
+          </div>
+          <div class="collective-stat-card">
+            <span class="collective-stat-label">Dietary Fiber</span>
+            <strong id="collective-fiber" class="serif collective-stat-value">0.0 <small>g</small></strong>
+            <span class="collective-stat-sub">Digestive health & satiety</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="groups-detail-grid">
+        <!-- Members & Contributions Breakdown -->
+        <div>
+          <h3 class="mb-3 text-sm font-bold text-[#173c2c]">Group Members & Nutrition Contributions</h3>
+          <div id="group-members-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Log Meal to Group + Recent Activity Feed -->
+        <div>
+          <div class="rounded-xl border border-[#dce2da] bg-[#fbfcf9] p-4 mb-5">
+            <h3 class="m-0 mb-1 text-sm font-bold text-[#173c2c]">Log a Meal to Group</h3>
+            <p class="m-0 mb-3 text-xs text-[#6d7871]">Enter foods (auto-calculated using IFCT 2017 reference data) or custom macros. Meals you explicitly log to your Tracker are also included!</p>
+            <form id="log-group-meal-form" novalidate>
+              <div class="form-grid-2 mb-3">
+                <div>
+                  <label for="group-meal-title" class="form-label !text-xs">Meal / Dish / Foods <span class="text-[#c65a42]">*</span></label>
+                  <input id="group-meal-title" name="meal_title" type="text" required placeholder="e.g. 150g Rice, 100g Toor dal, 50g Spinach" class="form-input !py-2 !text-xs">
+                </div>
+                <div>
+                  <label for="group-meal-type" class="form-label !text-xs">Meal Time</label>
+                  <select id="group-meal-type" name="meal_type" class="form-input !py-2 !text-xs">
+                    <option value="Breakfast">Breakfast</option>
+                    <option value="Lunch" selected>Lunch</option>
+                    <option value="Snacks">Snacks</option>
+                    <option value="Dinner">Dinner</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-grid-4 mb-3">
+                <div>
+                  <label for="group-meal-cals" class="form-label !text-[11px]">Calories (kcal)</label>
+                  <input id="group-meal-cals" name="calories_kcal" type="number" step="0.1" min="0" placeholder="Auto (IFCT)" class="form-input !py-1.5 !text-xs">
+                </div>
+                <div>
+                  <label for="group-meal-prot" class="form-label !text-[11px]">Protein (g)</label>
+                  <input id="group-meal-prot" name="protein_g" type="number" step="0.1" min="0" placeholder="Auto" class="form-input !py-1.5 !text-xs">
+                </div>
+                <div>
+                  <label for="group-meal-carbs" class="form-label !text-[11px]">Carbs (g)</label>
+                  <input id="group-meal-carbs" name="carbohydrates_g" type="number" step="0.1" min="0" placeholder="Auto" class="form-input !py-1.5 !text-xs">
+                </div>
+                <div>
+                  <label for="group-meal-fat" class="form-label !text-[11px]">Fat (g)</label>
+                  <input id="group-meal-fat" name="total_fat_g" type="number" step="0.1" min="0" placeholder="Auto" class="form-input !py-1.5 !text-xs">
+                </div>
+              </div>
+              <div class="flex justify-end">
+                <button type="submit" id="log-group-meal-btn" class="btn-primary !py-2 !px-4 !text-xs">
+                  <span>+ Log Meal to Group</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <h3 class="mb-3 text-sm font-bold text-[#173c2c]">Recent Group Nutrition Feed (Latest 5)</h3>
+          <div id="group-recent-meals" class="space-y-2.5 max-h-[260px] overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>

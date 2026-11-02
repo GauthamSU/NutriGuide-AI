@@ -175,3 +175,5 @@ class PolyphenolAdmin(admin.ModelAdmin):
 class BioactiveAdmin(admin.ModelAdmin):
     list_display = ("food", "beta_sitosterol_mg", "campesterol_mg", "phytate_mg", "total_saponin_mg")
     search_fields = ("food__food_code", "food__name")
+
+

@@ -495,8 +495,10 @@ def calculate_ingredient_nutrients(
     water_g = round((proximates.moisture_g or 0.0) * scale, 2) if proximates else 0.0
     sugars_g = round((sugars.total_free_sugars_g or 0.0) * scale, 2) if sugars else 0.0
 
-    # Saturated, Unsaturated, and Trans Fats
+    # Saturated, Unsaturated (MUFA, PUFA), and Trans Fats
     saturated_fat_g = 0.0
+    monounsaturated_fat_g = 0.0
+    polyunsaturated_fat_g = 0.0
     unsaturated_fat_g = 0.0
     trans_fat_g = 0.0
     cholesterol_mg = 0.0
@@ -505,12 +507,16 @@ def calculate_ingredient_nutrients(
         if fatty_acids.is_cooking_oil_percent:
             sfa_pct = (fatty_acids.total_sfa_mg or 0.0) / 100.0
             saturated_fat_g = round(sfa_pct * total_fat_g, 2)
-            unsat_pct = ((fatty_acids.total_mufa_mg or 0.0) + (fatty_acids.total_pufa_mg or 0.0)) / 100.0
-            unsaturated_fat_g = round(unsat_pct * total_fat_g, 2)
+            mufa_pct = (fatty_acids.total_mufa_mg or 0.0) / 100.0
+            monounsaturated_fat_g = round(mufa_pct * total_fat_g, 2)
+            pufa_pct = (fatty_acids.total_pufa_mg or 0.0) / 100.0
+            polyunsaturated_fat_g = round(pufa_pct * total_fat_g, 2)
+            unsaturated_fat_g = round(monounsaturated_fat_g + polyunsaturated_fat_g, 2)
         else:
             saturated_fat_g = round(((fatty_acids.total_sfa_mg or 0.0) / 1000.0) * scale, 2)
-            unsat_mg = (fatty_acids.total_mufa_mg or 0.0) + (fatty_acids.total_pufa_mg or 0.0)
-            unsaturated_fat_g = round((unsat_mg / 1000.0) * scale, 2)
+            monounsaturated_fat_g = round(((fatty_acids.total_mufa_mg or 0.0) / 1000.0) * scale, 2)
+            polyunsaturated_fat_g = round(((fatty_acids.total_pufa_mg or 0.0) / 1000.0) * scale, 2)
+            unsaturated_fat_g = round(monounsaturated_fat_g + polyunsaturated_fat_g, 2)
 
         trans_fat_g = round(((fatty_acids.elaidic_c18_1n9t_mg or 0.0) / 1000.0) * scale, 2)
         cholesterol_mg = round((fatty_acids.cholesterol_mg or 0.0) * scale, 2)
@@ -526,6 +532,8 @@ def calculate_ingredient_nutrients(
         "added_sugars_g": 0.0,
         "total_fat_g": total_fat_g,
         "saturated_fat_g": saturated_fat_g,
+        "monounsaturated_fat_g": monounsaturated_fat_g,
+        "polyunsaturated_fat_g": polyunsaturated_fat_g,
         "unsaturated_fat_g": unsaturated_fat_g,
         "trans_fat_g": trans_fat_g,
         "cholesterol_mg": cholesterol_mg,
@@ -600,6 +608,7 @@ def resolve_single_ingredient_from_db(
     macro_keys = [
         "calories_kcal", "protein_g", "carbohydrates_g", "dietary_fiber_g",
         "total_sugars_g", "added_sugars_g", "total_fat_g", "saturated_fat_g",
+        "monounsaturated_fat_g", "polyunsaturated_fat_g",
         "unsaturated_fat_g", "trans_fat_g", "cholesterol_mg", "sodium_mg", "water_g"
     ]
 
@@ -703,6 +712,7 @@ def resolve_dish_nutrition_from_db(
     macro_keys = [
         "calories_kcal", "protein_g", "carbohydrates_g", "dietary_fiber_g",
         "total_sugars_g", "added_sugars_g", "total_fat_g", "saturated_fat_g",
+        "monounsaturated_fat_g", "polyunsaturated_fat_g",
         "unsaturated_fat_g", "trans_fat_g", "cholesterol_mg", "sodium_mg", "water_g"
     ]
     total_macros = {k: 0.0 for k in macro_keys}

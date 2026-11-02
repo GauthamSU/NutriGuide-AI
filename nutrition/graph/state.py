@@ -29,6 +29,7 @@ class NutriGuideState(TypedDict, total=False):
     # --- 3. Stage 1: AI Dish & Ingredient Perception Output ---
     dish_name: Optional[str]
     recognized_input_summary: Optional[str]
+    ai_generated_response: Optional[Dict[str, Any]]
     identified_ingredients: List[Dict[str, Any]]
     dietary_tags: List[str]
     health_insights: List[str]

@@ -2,7 +2,13 @@ import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-import pymupdf
+try:
+    import pymupdf
+except ImportError:
+    try:
+        import fitz as pymupdf
+    except ImportError:
+        pymupdf = None
 
 logger = logging.getLogger(__name__)
 

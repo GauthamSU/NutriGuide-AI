@@ -1,0 +1,111 @@
+<section class="assistant-turn min-w-0 w-full max-w-full" aria-label="Nutrition analysis">
+  {% if result %}
+    {% set analysis = result.analysis %}
+    {% set is_logged = logged_to_tracker or result.logged_to_tracker %}
+    {% set msg_id = turn_id or result.message_id or '' %}
+
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2 text-[11px] font-semibold text-[#53645a]">
+        <span class="brand-mark !h-7 !w-7 !rounded-[8px_8px_8px_2px] !text-sm">N</span>
+        <span>NutriGuide</span>
+      </div>
+
+      <!-- Individual Dish Turn Action Bar: Log to Tracker & Delete Message -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="turn-action-btn {{ 'turn-action-logged' if is_logged else 'turn-action-log' }}"
+          data-log-to-tracker-btn
+          data-message-id="{{ msg_id }}"
+          data-conversation-id="{{ conversation_id or '' }}"
+          data-meal-title="{{ analysis.meal_title or 'Analyzed Meal' }}"
+          data-logged="{{ 'true' if is_logged else 'false' }}"
+          {% if is_logged %}disabled{% endif %}
+        >
+          {% if is_logged %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Logged to Tracker</span>
+          {% else %}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Log to Tracker</span>
+          {% endif %}
+        </button>
+
+        <button
+          type="button"
+          class="turn-action-btn turn-action-delete"
+          data-delete-message-btn
+          data-message-id="{{ msg_id }}"
+          data-conversation-id="{{ conversation_id or '' }}"
+          title="Delete this chat message"
+          aria-label="Delete this chat message"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+
+    <script type="application/json" data-turn-analysis-json>{{ analysis | tojson }}</script>
+
+    <h2 class="serif mb-1 text-[25px] leading-tight">{{ analysis.meal_title or "Meal analysis" }}</h2>
+    {% if result.transcription %}<p class="mb-4 rounded-md bg-[#f0f4ed] p-3 text-xs leading-relaxed text-[#53645a]"><strong>AI audio transcription:</strong> {{ result.transcription }}</p>{% endif %}
+    {% if analysis.recognized_input_summary %}<p class="mb-5 text-sm leading-relaxed text-[#6d7871]">{{ analysis.recognized_input_summary }}</p>{% endif %}
+    {% set macros = analysis.total_macronutrients or {} %}
+    <div class="mb-4 rounded-xl border border-[#dfe6dc] bg-white p-4 sm:p-5">
+      <p class="mb-1 text-[10px] font-bold uppercase tracking-[1px] text-[#6d7871]">Total calories</p>
+      <p class="serif mb-4 text-[36px] leading-none text-[#173c2c]">{{ "%.0f"|format(macros.get("calories_kcal", 0)) }} <span class="font-sans text-sm font-medium text-[#6d7871]">kcal</span></p>
+      <h3 class="mb-3 text-xs font-bold">Total macronutrients</h3>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+        {% for key, label, unit in [
+          ("protein_g", "Protein", "g"),
+          ("carbohydrates_g", "Carbohydrates", "g"),
+          ("dietary_fiber_g", "Dietary fiber", "g"),
+          ("total_sugars_g", "Total sugars", "g"),
+          ("added_sugars_g", "Added sugars", "g"),
+          ("total_fat_g", "Total fat", "g"),
+          ("saturated_fat_g", "Saturated fat", "g"),
+          ("monounsaturated_fat_g", "Monounsaturated fat", "g"),
+          ("polyunsaturated_fat_g", "Polyunsaturated fat", "g"),
+          ("unsaturated_fat_g", "Total unsaturated fat", "g"),
+          ("trans_fat_g", "Trans fat", "g"),
+          ("cholesterol_mg", "Cholesterol", "mg"),
+          ("sodium_mg", "Sodium", "mg"),
+          ("water_g", "Water", "g")
+        ] %}
+          <div class="flex justify-between gap-2 border-b border-[#edf0eb] py-1.5 text-xs"><span class="text-[#6d7871]">{{ label }}</span><strong class="whitespace-nowrap">{{ "%.1f"|format(macros.get(key) or 0) }} {{ unit }}</strong></div>
+        {% endfor %}
+      </div>
+      {% set micronutrients = analysis.total_micronutrients or {} %}
+      <div class="mt-5 border-t border-[#e3e7df] pt-4">
+        <h3 class="mb-3 text-xs font-bold">Total micronutrients</h3>
+        {% for category, label in [("vitamins", "Vitamins"), ("minerals", "Minerals")] %}
+          {% set nutrients = micronutrients.get(category) or [] %}
+          <h4 class="mb-2 mt-3 text-[10px] font-bold uppercase tracking-[.7px] text-[#6d7871]">{{ label }}</h4>
+          {% if nutrients %}
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+              {% for nutrient in nutrients %}<div class="flex justify-between gap-2 border-b border-[#edf0eb] py-1.5 text-xs"><span class="text-[#6d7871]">{{ nutrient.name }}</span><strong class="whitespace-nowrap">{{ "%.2f"|format(nutrient.amount) }} {{ nutrient.unit }}</strong></div>{% endfor %}
+            </div>
+          {% else %}<p class="text-xs text-[#89938c]">No {{ label|lower }} totals available for this meal.</p>{% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <details class="ingredient-disclosure min-w-0 w-full max-w-full overflow-hidden rounded-lg border border-[#e3e7df] bg-white px-4 py-3">
+      <summary class="min-w-0 break-words text-xs font-semibold text-[#35433b]">Ingredients and additional details <span class="ml-1 text-[#89938c]">({{ (analysis.get("items") or [])|length }})</span></summary>
+      <div class="ingredient-disclosure-clip"><div class="ingredient-disclosure-content mt-3 min-w-0 max-w-full border-t border-[#edf0eb]">
+        {% for item in analysis.get("items") or [] %}
+          <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#edf0eb] py-3">
+            <div class="min-w-0 max-w-full"><span class="block break-words text-xs font-semibold">{{ item.food_name }}</span><span class="block break-words text-[10px] text-[#6d7871]">{{ item.serving_size_description }}</span>{% if not item.found_in_database %}<span class="mt-1 inline-flex rounded bg-[#f7efe0] px-1.5 py-0.5 text-[9px] text-[#976b2f]">Not in database</span>{% endif %}</div>
+            <strong class="whitespace-nowrap text-xs">{{ "%.0f"|format(item.estimated_weight_grams) }} g</strong>
+          </div>
+        {% endfor %}
+        {% for warning in result.dietary_warnings or [] %}<p class="mt-3 rounded-md bg-[#fbf7ed] p-3 text-xs leading-relaxed text-[#71592f]">{{ warning }}</p>{% endfor %}
+        {% for missing in analysis.missing_ingredients or [] %}<p class="mt-3 rounded-md bg-[#fbf7ed] p-3 text-xs leading-relaxed text-[#71592f]">No reference food match for {{ missing }}.</p>{% endfor %}
+        {% for insight in analysis.health_insights or [] %}<p class="mt-3 rounded-md bg-[#eef4f6] p-3 text-xs leading-relaxed text-[#3e6172]">{{ insight }}</p>{% endfor %}
+      </div></div>
+    </details>
+    <p class="mt-3 text-[10px] leading-relaxed text-[#929b94]">Values are estimates scaled from reference food data using identified portions.</p>
+  {% else %}
+    <div class="rounded-lg border border-[#f1d8d1] bg-[#fff9f7] p-4 text-sm leading-relaxed text-[#9d4534]" role="alert">{{ error or "Analysis could not be completed." }}</div>
+  {% endif %}
+</section>

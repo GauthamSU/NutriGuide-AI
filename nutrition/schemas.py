@@ -1,6 +1,32 @@
-from typing import List, Optional
+import json
+from typing import Any, List, Optional
 from ninja import Schema
-from pydantic import Field
+from pydantic import Field, model_validator
+
+
+MEAL_PLAN_PREFERENCES = (
+    "Blood-sugar conscious",
+    "Heart-healthy",
+    "Weight management",
+    "Healthy weight gain",
+    "Plant-forward",
+    "High-protein",
+    "Gluten-free",
+    "Dairy-free",
+)
+
+MEAL_PLAN_DURATIONS = (
+    "daily",
+    "weekly",
+    "monthly",
+)
+
+MEAL_PLAN_DIET_TYPES = (
+    "veg",
+    "non-veg",
+    "vegan",
+    "egg",
+)
 
 
 class MicronutrientItemSchema(Schema):
@@ -178,6 +204,8 @@ class TextAnalyzeRequestSchema(Schema):
         default=None,
         description="Optional user identifier for future personalization nodes in LangGraph",
     )
+    owner_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class NutrientAnalysisResponseSchema(Schema):
@@ -189,11 +217,170 @@ class NutrientAnalysisResponseSchema(Schema):
         default_factory=list,
         description="Actionable dietary alerts, allergen notices, or missing database ingredient warnings",
     )
+    transcription: Optional[str] = None
+    message_id: Optional[str] = None
+    logged_to_tracker: bool = False
+    tracker_log_id: Optional[str] = None
 
 
 class ErrorResponseSchema(Schema):
     detail: str
     errors: Optional[List[str]] = None
+
+
+class MealPlanRequestSchema(Schema):
+    preferences: List[str] = Field(default_factory=list, max_length=8)
+    custom_request: str = Field(default="", max_length=2000)
+    owner_id: Optional[str] = Field(default=None, max_length=64)
+    duration: str = Field(default="daily", max_length=32)
+    diet_type: str = Field(default="", max_length=32)
+    image_base64: Optional[str] = None
+    image_mime_type: Optional[str] = None
+    image_name: Optional[str] = None
+    audio_base64: Optional[str] = None
+    audio_format: Optional[str] = None
+    audio_name: Optional[str] = None
+    user_id: Optional[Any] = None
+
+
+class SignupRequestSchema(Schema):
+    username: str = Field(..., min_length=1, max_length=150)
+    email: str = Field(..., min_length=3, max_length=254)
+    password: str = Field(..., min_length=1, max_length=256)
+    name: Optional[str] = Field(default="", max_length=150)
+    owner_id: Optional[str] = None
+
+
+class LoginRequestSchema(Schema):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    username_or_email: Optional[str] = None
+    password: str = Field(..., min_length=1, max_length=256)
+
+
+class UserProfileUpdateSchema(Schema):
+    name: Optional[str] = None
+    age: Optional[Any] = None
+    height: Optional[Any] = None
+    height_cm: Optional[Any] = None
+    weight: Optional[Any] = None
+    weight_kg: Optional[Any] = None
+    gender: Optional[str] = None
+    allergies: Optional[str] = None
+    bio: Optional[str] = None
+    email: Optional[str] = None
+    profile_picture: Optional[str] = None
+    avatar_url: Optional[str] = None
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+
+
+class TrackerLogRequestSchema(Schema):
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+    message_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    meal_title: Optional[str] = None
+    meal_type: str = Field(default="Meal", max_length=32)
+    recognized_summary: str = Field(default="", max_length=2000)
+    analysis: Optional[dict] = None
+    logged_via: Optional[str] = Field(default=None, max_length=32)
+    consumed_at: Optional[str] = None
+    time_option: Optional[str] = Field(default="now", max_length=16)
+    calories_kcal: Optional[float] = None
+    protein_g: Optional[float] = None
+    carbohydrates_g: Optional[float] = None
+    total_fat_g: Optional[float] = None
+    dietary_fiber_g: Optional[float] = None
+    total_sugars_g: Optional[float] = None
+
+
+
+class GroupCreateRequestSchema(Schema):
+    name: str = Field(..., min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    is_public: Optional[bool] = None
+    visibility: Optional[str] = None
+    member_identifiers: Optional[List[str]] = None
+    members: Optional[List[str]] = None
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+
+
+class GroupAddMemberRequestSchema(Schema):
+    identifier: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+
+
+class GroupRequestRespondSchema(Schema):
+    action: str = Field(..., description="'accept' or 'reject' (or 'cancel')")
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+
+
+class GroupMealLogRequestSchema(Schema):
+    meal_title: str = Field(..., min_length=1, max_length=200)
+    meal_type: str = Field(default="Meal", max_length=32)
+    calories_kcal: Optional[float] = None
+    protein_g: Optional[float] = None
+    carbohydrates_g: Optional[float] = None
+    total_fat_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    dietary_fiber_g: Optional[float] = None
+    fiber_g: Optional[float] = None
+    serving_grams: Optional[float] = None
+    serving_notes: str = Field(default="", max_length=1000)
+    owner_id: Optional[str] = None
+    token: Optional[str] = None
+
+
+class MealPlanOptionSchema(Schema):
+    name: str
+    details: str
+    why_it_fits: str
+
+
+class MealPlanSectionSchema(Schema):
+    options: List[MealPlanOptionSchema] = Field(..., min_length=1, max_length=25)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_options(cls, data: Any) -> Any:
+        if isinstance(data, list):
+            return {"options": data}
+        return data
+
+
+class MealPlanResponseSchema(Schema):
+    summary: str
+    breakfast: MealPlanSectionSchema
+    lunch: MealPlanSectionSchema
+    snacks: MealPlanSectionSchema
+    dinner: MealPlanSectionSchema
+
+    @classmethod
+    def to_compact_json(cls) -> str:
+        return json.dumps(
+            cls.model_json_schema(),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_root(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "summary" not in data or not data.get("summary"):
+                for key in ("plan_summary", "overview", "description", "title"):
+                    if data.get(key):
+                        data["summary"] = data[key]
+                        break
+                else:
+                    data["summary"] = "Personalized meal plan tailored to your preferences."
+        return data
 
 
 class HealthCheckResponseSchema(Schema):
