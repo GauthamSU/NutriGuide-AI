@@ -1,23 +1,40 @@
 # NutriGuide-AI Backend API
 
-Multimodal (Text, Image, Voice) Food Nutrient Analysis API built with **Django Ninja**, **LangGraph**, and local **Gemma 4 E2B** (`gemma-4-E2B-it-Q4_K_M.gguf` + `mmproj-F16.gguf`) via **llama.cpp**, powered by a comprehensive relational reference database parsed from the **Indian Food Composition Tables (IFCT 2017)** (ICMR - National Institute of Nutrition).
+Multimodal (Text, Image, Voice) Food Nutrient Analysis API built with **Django Ninja** and **LangGraph**, powered by a comprehensive relational reference database parsed from the **Indian Food Composition Tables (IFCT 2017)** (ICMR - National Institute of Nutrition). Inference can use either local Gemma 4 through **llama.cpp** or Google **Gemini** through its OpenAI-compatible API.
 
 - 📊 **Architecture & Flowchart**: See [flowchart.md](file:///d:/Agentic_AI/NutriGuide-AI/flowchart.md) for the end-to-end processing and ingestion flows.
 - 🗄️ **Database Schema & ER Diagrams**: See [er_diagrams.md](file:///d:/Agentic_AI/NutriGuide-AI/er_diagrams.md) for the complete relational satellite schema.
 
 ---
 
-## Quick Start (Local Development)
+## Quick Start
 
-### 1. Start Local Gemma 4 Multimodal Server (`llama-server.exe`)
-Run the helper script in a terminal to start `D:\llama-cpp\llama-server.exe` on `http://127.0.0.1:8080`:
+### 1. Configure the environment
+Create a local `.env` from the tracked example:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Choose the inference backend in `.env` with `INFERENCE_BACKEND`:
+
+- `local` uses the local llama.cpp server and the configured Gemma model files.
+- `gemini` uses the Gemini API. Set `GEMINI_API_KEY` to your own API key and, optionally, change `GEMINI_MODEL_NAME`.
+
+Do not commit `.env`; it contains local configuration and may contain secrets. The `.env.example` file is safe to commit and should contain placeholders only.
+
+### 2. Start the selected inference backend
+
+For `INFERENCE_BACKEND=local`, start the local Gemma 4 multimodal server (`llama-server.exe`). Run the helper script in a terminal to start it on `http://127.0.0.1:8080`:
 
 ```powershell
 .\scripts\start_llama_server.ps1
 ```
 
-### 2. Start the Django Ninja API Server
-In a second terminal, run the Django server using the project's `venv`:
+For `INFERENCE_BACKEND=gemini`, no local inference server is needed; make sure the API key is set in `.env`.
+
+### 3. Start the Django Ninja API server
+Run the Django server using the project's `venv`:
 
 ```powershell
 .\venv\Scripts\python.exe manage.py runserver 8000
@@ -25,6 +42,8 @@ In a second terminal, run the Django server using the project's `venv`:
 
 Open the interactive Swagger UI at:
 - **`http://127.0.0.1:8000/api/docs`**
+
+The health endpoint (`/api/nutrition/health`) reports the active inference backend and its connectivity status.
 
 ---
 
@@ -124,8 +143,8 @@ python manage.py test
    - `DEBUG=False`
    - `SECRET_KEY=<strong-unique-secret-key>`
    - `ALLOWED_HOSTS=api.yourdomain.com,127.0.0.1`
-   - `LLAMA_CPP_BASE_URL=http://<inference-host>:8080`
-   - `LLAMA_CPP_TIMEOUT_SECONDS=45`
+   - Set `INFERENCE_BACKEND=local` and configure `LLAMA_SERVER_BASE_URL` / `LLAMA_TIMEOUT_SECONDS` for a local inference server, or set `INFERENCE_BACKEND=gemini` and provide `GEMINI_API_KEY` / `GEMINI_MODEL_NAME`.
+   - The supported environment variables and development defaults are listed in `.env.example`.
 3. **Static Files & Admin**:
    - Collect static assets for the Django Admin interface:
      ```bash
@@ -136,8 +155,9 @@ python manage.py test
      python manage.py createsuperuser
      ```
 4. **Inference Server Hardware Acceleration**:
-   - For lower inference latency, run `llama-server` on a GPU-enabled host (NVIDIA CUDA or Vulkan build).
+   - For local inference, run `llama-server` on a GPU-enabled host (NVIDIA CUDA or Vulkan build).
    - Ensure `gemma-4-E2B-it-Q4_K_M.gguf` and `mmproj-F16.gguf` are accessible on fast NVMe storage.
+   - For Gemini inference, secure and rotate the API key using your deployment's secret manager.
 
 ---
 
@@ -161,7 +181,7 @@ NutriGuide-AI enforces a strict separation between **AI culinary perception** an
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/nutrition/health` | Verifies API status, `llama-server` connectivity, and model file availability. |
+| `GET` | `/api/nutrition/health` | Verifies API status and the active inference backend's connectivity. |
 | `POST` | `/api/nutrition/analyze/text` | Accepts JSON `{"text": "...", "user_id": "..."}`, identifies dish/ingredients via AI, and calculates database nutrients. |
 | `POST` | `/api/nutrition/analyze` | Accepts `multipart/form-data` with `text`, `image` (JPEG/PNG/WebP), and/or `voice` (WAV/MP3). |
 
