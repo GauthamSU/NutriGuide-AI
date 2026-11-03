@@ -1,15 +1,16 @@
 from ninja import Router
 
-from chat_history.services import (
+from backend.assistant.services import (
     delete_chat_message,
     delete_conversation,
-    delete_meal_plan,
     get_chat_attachment,
     get_conversation,
     list_conversations,
+)
+from backend.meal_planner.services import (
+    delete_meal_plan,
     list_meal_plans,
 )
-
 
 router = Router(tags=["Chat History"])
 

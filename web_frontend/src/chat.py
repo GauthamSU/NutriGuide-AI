@@ -1,7 +1,7 @@
 import asyncio
 
 from pyscript import when, web, window
-from pyodide.ffi import to_js
+from pyscript.ffi import to_js  # dicts -> plain JS objects (not Map)
 
 
 recording = {
@@ -370,6 +370,71 @@ def handle_enter(event):
         send_btn = element("send-button")
         if send_btn:
             send_btn.click()
+
+
+async def handle_delete_chat_message(msg_id: str, conv_id: str = "") -> None:
+    """Delete a single chat message turn from conversation history."""
+    if not msg_id:
+        return
+    turn = window.document.getElementById(f"turn-{msg_id}")
+    if turn:
+        turn.style.opacity = "0.3"
+        turn.style.pointerEvents = "none"
+    try:
+        if not conv_id:
+            active_chat = window.document.querySelector("main[data-conversation-id]")
+            if active_chat:
+                conv_id = getattr(active_chat.dataset, "conversationId", "") or ""
+
+        delete_url = (
+            f"/chats/{conv_id}/messages/{msg_id}/delete"
+            if conv_id
+            else f"/chats/messages/{msg_id}/delete"
+        )
+        resp = await window.fetch(
+            delete_url,
+            to_js({"method": "POST", "headers": {"Accept": "application/json"}}),
+        )
+        if resp.ok and turn:
+            turn.remove()
+        elif turn:
+            turn.style.opacity = "1"
+            turn.style.pointerEvents = "auto"
+    except Exception:
+        if turn:
+            turn.style.opacity = "1"
+            turn.style.pointerEvents = "auto"
+
+
+async def handle_delete_conversation(conv_id: str) -> None:
+    """Delete an entire chat conversation from database and sidebar."""
+    if not conv_id:
+        return
+    item = (
+        window.document.querySelector(f'[data-chat-history-row="{conv_id}"]')
+        or window.document.querySelector(f'[data-conversation-item-id="{conv_id}"]')
+    )
+    if item:
+        item.style.opacity = "0.3"
+        item.style.pointerEvents = "none"
+    try:
+        resp = await window.fetch(
+            f"/chats/{conv_id}/delete",
+            to_js({"method": "POST", "headers": {"Accept": "application/json"}}),
+        )
+        if resp.ok:
+            if item:
+                item.remove()
+            active_chat = window.document.querySelector("main[data-conversation-id]")
+            if active_chat and getattr(active_chat.dataset, "conversationId", "") == conv_id:
+                window.location.href = "/"
+        elif item:
+            item.style.opacity = "1"
+            item.style.pointerEvents = "auto"
+    except Exception:
+        if item:
+            item.style.opacity = "1"
+            item.style.pointerEvents = "auto"
 
 
 @when("click", "body")

@@ -1,36 +1,36 @@
-<header class="topbar">
+<header class="h-[68px] flex-none border-b border-stone-200/80 bg-white/95 backdrop-blur-md sticky top-0 z-40">
   <div class="flex h-full items-center justify-between px-4 sm:px-8">
-    <div class="flex items-center gap-2">
-      <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded="true" title="Collapse or expand sidebar">
+    <div class="flex items-center gap-3">
+      <button id="sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-expanded="true" title="Collapse or expand sidebar" class="h-9 w-9 rounded-xl flex items-center justify-center text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition cursor-pointer">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
-      <a class="flex items-center gap-[11px] text-[#202b26] no-underline" href="/" aria-label="NutriGuide home">
-        <span class="brand-mark" aria-hidden="true">N</span>
-        <span class="text-base font-bold">nutri<span class="text-[#245c43]">guide</span></span>
+      <a class="flex items-center gap-2.5 text-[#202b26] no-underline group" href="/" aria-label="NutriGuide home">
+        <span class="flex h-8 w-8 items-center justify-center rounded-[10px_10px_10px_3px] bg-[#245c43] text-base font-bold text-[#d7ed9f] shadow-xs group-hover:scale-105 transition-transform" aria-hidden="true">N</span>
+        <span class="text-base font-bold tracking-tight text-stone-900">nutri<span class="text-[#245c43]">guide</span></span>
       </a>
     </div>
-    <div class="flex items-center gap-3 text-[10px] text-[#6d7871] sm:gap-5 sm:text-xs">
-      <span class="topbar-model">{{ health.model_name or health.inference_backend|title if health else "Nutrition API" }}</span>
-      <span class="health inline-flex items-center gap-2" data-state="{{ 'online' if health and health.llama_server_reachable else 'offline' }}" role="status">
-        <span class="health-dot" aria-hidden="true"></span>
+    <div class="flex items-center gap-3 text-xs text-stone-500 sm:gap-5">
+      <span class="hidden sm:inline-block font-medium text-stone-500">{{ health.model_name or health.inference_backend|title if health else "Nutrition API" }}</span>
+      <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold border {% if health and health.llama_server_reachable %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-stone-200 bg-stone-100 text-stone-600{% endif %}" role="status">
+        <span class="h-2 w-2 rounded-full {% if health and health.llama_server_reachable %}bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]{% else %}bg-stone-400{% endif %}" aria-hidden="true"></span>
         <span>{{ "Engine online" if health and health.llama_server_reachable else "API unavailable" }}</span>
       </span>
-      <div id="topbar-auth-area" class="flex items-center gap-2 border-l border-[#e3e7df] pl-3 sm:pl-4">
+      <div id="topbar-auth-area" class="flex items-center gap-2 border-l border-stone-200 pl-3 sm:pl-4">
         {% if current_user %}
-          <a href="/profile" class="topbar-user-pill" title="View & edit your profile">
-            <span class="topbar-avatar overflow-hidden" aria-hidden="true">
+          <a href="/profile" class="inline-flex items-center gap-2 py-1 px-2.5 rounded-full border border-stone-200 bg-stone-50 hover:bg-emerald-50/70 hover:border-emerald-300 text-stone-800 text-xs font-semibold transition" title="View & edit your profile">
+            <span class="h-6 w-6 rounded-full bg-[#245c43] text-[#d7ed9f] flex items-center justify-center text-[11px] font-bold overflow-hidden flex-none" aria-hidden="true">
               {% if current_user.profile_picture %}
                 <img id="topbar-avatar-img" src="{{ current_user.profile_picture }}" alt="{{ current_user.name or current_user.username }}" class="h-full w-full object-cover">
               {% else %}
                 <span id="topbar-avatar-initial">{{ (current_user.name or current_user.username or "U")[0]|upper }}</span>
               {% endif %}
             </span>
-            <span class="topbar-username" id="topbar-username-label">{{ current_user.name or current_user.username }}</span>
+            <span class="max-w-[120px] truncate" id="topbar-username-label">{{ current_user.name or current_user.username }}</span>
           </a>
-          <button type="button" id="header-logout-btn" class="topbar-btn-ghost" title="Log out">Log out</button>
+          <button type="button" id="header-logout-btn" class="px-3 py-1.5 text-xs font-semibold text-stone-600 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg transition cursor-pointer" title="Log out">Log out</button>
         {% else %}
-          <a href="/login" class="topbar-btn-ghost">Log in</a>
-          <a href="/signup" class="topbar-btn-primary">Sign up</a>
+          <a href="/login" class="px-3 py-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg transition cursor-pointer">Log in</a>
+          <a href="/signup" class="px-3.5 py-1.5 text-xs font-bold text-white bg-[#245c43] hover:bg-[#173c2c] rounded-lg shadow-xs transition cursor-pointer">Sign up</a>
         {% endif %}
       </div>
     </div>

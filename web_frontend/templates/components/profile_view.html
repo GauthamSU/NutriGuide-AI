@@ -3,96 +3,94 @@
   <div class="mx-auto max-w-[1120px]">
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p class="section-eyebrow">Personal Biometrics & Dietary Context</p>
-        <h1 class="serif mb-2 text-[32px] leading-tight sm:text-[38px]">Your Nutrition Profile</h1>
-        <p class="max-w-2xl text-sm leading-relaxed text-[#6d7871]">Keep your display picture, personal details, body metrics, allergies, and bio up to date so NutriGuide can tailor meal plans and nutritional insights to you.</p>
+        <p class="text-[11px] font-bold uppercase tracking-wider text-stone-500">Personal Biometrics & Dietary Context</p>
+        <h1 class="font-serif mb-2 text-[30px] font-bold leading-tight text-[#173c2c] sm:text-[36px]">Your Nutrition Profile</h1>
+        <p class="max-w-2xl text-xs sm:text-sm leading-relaxed text-stone-600">Keep your display picture, personal details, body metrics, allergies, and bio up to date so NutriGuide can tailor meal plans and nutritional insights to you.</p>
       </div>
       {% if not current_user %}
         <div class="flex items-center gap-2">
-          <a href="/login" class="btn-secondary">Log in</a>
-          <a href="/signup" class="btn-primary">Create Account →</a>
+          <a href="/login" class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors">Log in</a>
+          <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#245c43] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#173c2c] transition-colors">Create Account →</a>
         </div>
       {% endif %}
     </div>
 
     {% if not current_user %}
-      <div id="profile-auth-gate" class="panel panel-padded mb-6 border-[#f3d2c8] bg-[#fff9f7]" role="alert">
+      <div id="profile-auth-gate" class="mb-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-5 sm:p-6 shadow-xs" role="alert">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-start gap-3.5">
-            <span class="feature-icon !bg-[#fdf0ec] !text-[#9d4534]" aria-hidden="true">
+            <span class="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-[#9d4534] flex-none" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </span>
             <div>
-              <p class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#9d4534]">Authentication Required</p>
-              <h2 class="serif m-0 mt-0.5 text-xl text-[#173c2c]">Please log in or sign up to create your profile</h2>
-              <p class="m-0 mt-1 text-xs leading-relaxed text-[#53645a]">Profile creation and saving (including display picture, biometrics, and allergies) are unlocked once you sign in to your NutriGuide account.</p>
+              <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[#9d4534]">Authentication Required</p>
+              <h2 class="font-serif m-0 mt-0.5 text-lg font-bold text-[#173c2c]">Please log in or sign up to create your profile</h2>
+              <p class="m-0 mt-1 text-xs leading-relaxed text-stone-600">Profile creation and saving (including display picture, biometrics, and allergies) are unlocked once you sign in to your NutriGuide account.</p>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2.5">
-            <a href="/login" class="btn-secondary">Log In</a>
-            <a href="/signup" class="btn-primary">Create Account (Sign Up) →</a>
+            <a href="/login" class="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors">Log In</a>
+            <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#245c43] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#173c2c] transition-colors">Create Account →</a>
           </div>
         </div>
       </div>
     {% endif %}
 
-    <div class="profile-layout">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- Profile Form -->
-      <section class="panel panel-padded">
-        <div class="mb-5 flex items-center justify-between border-b border-[#e3e7df] pb-4">
+      <section class="lg:col-span-7 rounded-2xl border border-stone-200 bg-white p-5 sm:p-7 shadow-xs">
+        <div class="mb-5 flex items-center justify-between border-b border-stone-100 pb-4">
           <div>
-            <h2 class="serif m-0 text-2xl">Personal & Health Details</h2>
-            <p class="m-0 mt-1 text-xs text-[#6d7871]">All fields are used to personalize your meal plans and allergy warnings.</p>
+            <h2 class="font-serif m-0 text-xl font-bold text-[#173c2c]">Personal & Health Details</h2>
+            <p class="m-0 mt-1 text-xs text-stone-500">All fields are used to personalize your meal plans and allergy warnings.</p>
           </div>
           {% if p.username %}
-            <span class="badge-pill badge-green">@{{ p.username }}</span>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-1 text-xs font-bold">@{{ p.username }}</span>
           {% else %}
-            <span class="badge-pill badge-coral">Sign in required</span>
+            <span class="rounded-full bg-amber-100 text-amber-800 border border-amber-200 px-3 py-1 text-xs font-bold">Sign in required</span>
           {% endif %}
         </div>
 
-        <p id="profile-feedback" class="hidden mb-5 rounded-lg border p-3.5 text-sm" role="alert"></p>
+        <p id="profile-feedback" class="hidden mb-5 rounded-xl border p-3.5 text-xs font-medium" role="alert"></p>
 
         <form id="profile-form" novalidate data-authenticated="{{ 'true' if current_user else 'false' }}">
           <input type="hidden" name="owner_id" value="{{ owner_id }}">
           <input type="hidden" name="profile_picture" id="profile-picture-data" value="{{ p.profile_picture or '' }}">
+          <input type="hidden" name="remove_avatar" id="remove-profile-picture-flag" value="0">
 
           <fieldset {% if not current_user %}disabled class="m-0 border-0 p-0 opacity-50 pointer-events-none select-none"{% else %}class="m-0 border-0 p-0"{% endif %}>
             <!-- Profile Picture / Display Picture Upload -->
-            <div class="mb-6 rounded-xl border border-[#dfe6dc] bg-[#fbfcf9] p-4">
-              <span class="form-label !mb-2">Profile / Display Picture</span>
+            <div class="mb-6 rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+              <span class="block text-xs font-bold text-stone-700 mb-2.5">Profile / Display Picture</span>
               <div class="flex flex-wrap items-center gap-4">
-                <div id="profile-avatar-preview" class="profile-avatar-lg !h-16 !w-16 overflow-hidden border-2 border-[#c6dac9] shadow-sm">
-                  {% if p.profile_picture %}
-                    <img id="profile-avatar-preview-img" src="{{ p.profile_picture }}" alt="Profile picture preview" class="h-full w-full object-cover">
-                  {% else %}
-                    <span id="profile-avatar-preview-initial">{{ (p.name or p.username or "N")[0]|upper }}</span>
-                  {% endif %}
+                <div class="h-16 w-16 rounded-full bg-[#245c43] text-white flex items-center justify-center font-bold text-xl flex-none overflow-hidden border-2 border-stone-300 shadow-sm relative">
+                  <img id="profile-avatar-preview" src="{{ p.profile_picture or '' }}" alt="Profile picture preview" class="h-full w-full object-cover {% if not p.profile_picture %}hidden{% endif %}">
+                  <span id="profile-avatar-placeholder" class="{% if p.profile_picture %}hidden{% endif %}">{{ (p.name or p.username or "N")[0]|upper }}</span>
                 </div>
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <label for="profile-avatar-file" class="btn-secondary !py-1.5 !px-3.5 !text-xs cursor-pointer">
+                    <label for="profile-avatar-file" class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 transition-colors cursor-pointer">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      <span>Upload Display Picture</span>
+                      <span>Upload Picture</span>
                     </label>
                     <input id="profile-avatar-file" name="avatar" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only">
-                    <button type="button" id="profile-remove-avatar-btn" class="btn-secondary !py-1.5 !px-3 !text-xs text-[#9d4534] {% if not p.profile_picture %}hidden{% endif %}">
-                      Remove Picture
+                    <button type="button" id="profile-remove-avatar-btn" class="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 shadow-2xs hover:bg-red-50 transition-colors cursor-pointer {% if not p.profile_picture %}hidden{% endif %}">
+                      Remove
                     </button>
                   </div>
-                  <span class="form-hint">Supports JPG, PNG, or WebP. Shown on your profile, top bar, and nutrition groups.</span>
+                  <span class="block mt-1 text-[11px] text-stone-500">Supports JPG, PNG, or WebP. Shown across chats, top bar, and groups.</span>
                 </div>
               </div>
             </div>
 
-            <div class="form-grid-2 mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label for="profile-name" class="form-label">Full Name</label>
-                <input id="profile-name" name="name" type="text" maxlength="150" value="{{ p.name or '' }}" placeholder="e.g. Ananya Rao" class="form-input">
+                <label for="profile-name" class="block text-xs font-bold text-stone-700 mb-1.5">Full Name</label>
+                <input id="profile-name" name="name" type="text" maxlength="150" value="{{ p.name or '' }}" placeholder="e.g. Ananya Rao" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
               </div>
               <div>
-                <label for="profile-gender" class="form-label">Gender</label>
-                <select id="profile-gender" name="gender" class="form-input">
+                <label for="profile-gender" class="block text-xs font-bold text-stone-700 mb-1.5">Gender</label>
+                <select id="profile-gender" name="gender" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
                   {% set cur_gender = (p.gender or '')|lower %}
                   <option value="" {% if not cur_gender %}selected{% endif %}>Select gender…</option>
                   <option value="Female" {% if cur_gender == 'female' %}selected{% endif %}>Female</option>
@@ -104,47 +102,47 @@
               </div>
             </div>
 
-            <div class="form-grid-3 mb-5">
+            <div class="grid grid-cols-3 gap-3 mb-5">
               <div>
-                <label for="profile-age" class="form-label">Age (years)</label>
-                <input id="profile-age" name="age" type="number" min="1" max="130" step="1" value="{{ p.age if p.age is not none else '' }}" placeholder="e.g. 28" class="form-input">
+                <label for="profile-age" class="block text-xs font-bold text-stone-700 mb-1.5">Age (yrs)</label>
+                <input id="profile-age" name="age" type="number" min="1" max="130" step="1" value="{{ p.age if p.age is not none else '' }}" placeholder="e.g. 28" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
               </div>
               <div>
-                <label for="profile-height" class="form-label">Height (cm)</label>
-                <input id="profile-height" name="height_cm" type="number" min="30" max="300" step="0.1" value="{{ p.height_cm if p.height_cm is not none else '' }}" placeholder="e.g. 168" class="form-input">
+                <label for="profile-height" class="block text-xs font-bold text-stone-700 mb-1.5">Height (cm)</label>
+                <input id="profile-height" name="height_cm" type="number" min="30" max="300" step="0.1" value="{{ p.height_cm if p.height_cm is not none else '' }}" placeholder="e.g. 168" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
               </div>
               <div>
-                <label for="profile-weight" class="form-label">Weight (kg)</label>
-                <input id="profile-weight" name="weight_kg" type="number" min="2" max="500" step="0.1" value="{{ p.weight_kg if p.weight_kg is not none else '' }}" placeholder="e.g. 64.5" class="form-input">
+                <label for="profile-weight" class="block text-xs font-bold text-stone-700 mb-1.5">Weight (kg)</label>
+                <input id="profile-weight" name="weight_kg" type="number" min="2" max="500" step="0.1" value="{{ p.weight_kg if p.weight_kg is not none else '' }}" placeholder="e.g. 64.5" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
               </div>
             </div>
 
             <div class="mb-5">
-              <label for="profile-allergies" class="form-label">Allergies & Dietary Intolerances</label>
-              <input id="profile-allergies" name="allergies" type="text" maxlength="2000" value="{{ p.allergies or '' }}" placeholder="e.g. Peanuts, Shellfish, Lactose, Gluten" class="form-input">
-              <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                <span class="text-[11px] font-semibold text-[#6d7871]">Quick add:</span>
+              <label for="profile-allergies" class="block text-xs font-bold text-stone-700 mb-1.5">Allergies & Dietary Intolerances</label>
+              <input id="profile-allergies" name="allergies" type="text" maxlength="2000" value="{{ p.allergies or '' }}" placeholder="e.g. Peanuts, Shellfish, Lactose, Gluten" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
+              <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <span class="text-[11px] font-semibold text-stone-500">Quick add:</span>
                 {% for allergen in ["Peanuts", "Tree nuts", "Dairy / Lactose", "Gluten", "Soy", "Egg", "Shellfish", "Sesame"] %}
-                  <button type="button" class="allergy-quick-chip" data-allergen="{{ allergen }}">+ {{ allergen }}</button>
+                  <button type="button" class="allergy-quick-chip rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition-colors cursor-pointer" data-add-allergen="{{ allergen }}">+ {{ allergen }}</button>
                 {% endfor %}
               </div>
             </div>
 
             <div class="mb-5">
-              <label for="profile-bio" class="form-label">General Bio & Nutrition Goals</label>
-              <textarea id="profile-bio" name="bio" rows="4" maxlength="3000" placeholder="Tell us a bit about yourself, your daily routine, regional cuisine preferences, or fitness goals…" class="form-input resize-y">{{ p.bio or '' }}</textarea>
+              <label for="profile-bio" class="block text-xs font-bold text-stone-700 mb-1.5">General Bio & Nutrition Goals</label>
+              <textarea id="profile-bio" name="bio" rows="4" maxlength="3000" placeholder="Tell us a bit about yourself, your daily routine, regional cuisine preferences, or fitness goals…" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all resize-y">{{ p.bio or '' }}</textarea>
             </div>
           </fieldset>
 
-          <div class="form-actions-bar">
-            <p class="m-0 text-xs text-[#6d7871]">Saved allergies and goals are automatically included when generating meal plans.</p>
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-stone-100">
+            <p class="m-0 text-xs text-stone-500">Saved allergies and goals are automatically included when generating meal plans.</p>
             {% if current_user %}
-              <button type="submit" id="profile-save-btn" class="btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <button type="submit" id="profile-save-btn" class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#245c43] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#173c2c] transition-colors cursor-pointer">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 <span>Save Profile</span>
               </button>
             {% else %}
-              <a href="/login" class="btn-primary">
+              <a href="/login" class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#245c43] px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#173c2c] transition-colors cursor-pointer">
                 <span>Log In to Create Profile →</span>
               </a>
             {% endif %}
@@ -153,9 +151,9 @@
       </section>
 
       <!-- Live Profile Summary Card -->
-      <aside class="panel panel-padded bg-[#fbfcf9]">
-        <div class="mb-4 flex items-center gap-3.5 border-b border-[#e3e7df] pb-4">
-          <span id="summary-avatar" class="profile-avatar-lg overflow-hidden">
+      <aside class="lg:col-span-5 rounded-2xl border border-stone-200 bg-stone-50/70 p-5 sm:p-7 shadow-2xs">
+        <div class="mb-4 flex items-center gap-3.5 border-b border-stone-200/80 pb-4">
+          <span id="summary-avatar" class="h-14 w-14 rounded-full bg-[#245c43] text-white flex items-center justify-center font-bold text-lg flex-none overflow-hidden border-2 border-stone-300 shadow-2xs">
             {% if p.profile_picture %}
               <img id="summary-avatar-img" src="{{ p.profile_picture }}" alt="{{ p.name or p.username or 'Profile' }}" class="h-full w-full object-cover">
             {% else %}
@@ -163,52 +161,52 @@
             {% endif %}
           </span>
           <div class="min-w-0">
-            <h2 id="summary-name" class="serif m-0 truncate text-2xl text-[#173c2c]">{{ p.name or p.username or "Guest Visitor" }}</h2>
-            <p id="summary-account" class="m-0 text-xs text-[#6d7871]">
+            <h2 id="summary-name" class="font-serif m-0 truncate text-xl font-bold text-[#173c2c]">{{ p.name or p.username or "Guest Visitor" }}</h2>
+            <p id="summary-account" class="m-0 text-xs text-stone-500">
               {% if p.username %}@{{ p.username }}{% if p.email %} · {{ p.email }}{% endif %}{% else %}Not signed in — log in to create your profile{% endif %}
             </p>
           </div>
         </div>
 
-        <div class="stat-grid-2 mb-4">
-          <div class="stat-mini-card">
-            <span class="stat-mini-label">Age / Gender</span>
-            <strong id="summary-age-gender" class="stat-mini-value">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="rounded-xl border border-stone-200 bg-white p-3 shadow-2xs">
+            <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-400">Age / Gender</span>
+            <strong id="summary-age-gender" class="block mt-0.5 text-xs font-bold text-stone-800">
               {% if p.age or p.gender %}{{ p.age ~ ' yrs' if p.age else '—' }}{% if p.gender %} · {{ p.gender }}{% endif %}{% else %}Not set{% endif %}
             </strong>
           </div>
-          <div class="stat-mini-card">
-            <span class="stat-mini-label">Height / Weight</span>
-            <strong id="summary-height-weight" class="stat-mini-value">
+          <div class="rounded-xl border border-stone-200 bg-white p-3 shadow-2xs">
+            <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-400">Height / Weight</span>
+            <strong id="summary-height-weight" class="block mt-0.5 text-xs font-bold text-stone-800">
               {% if p.height_cm or p.weight_kg %}{{ p.height_cm ~ ' cm' if p.height_cm else '—' }} / {{ p.weight_kg ~ ' kg' if p.weight_kg else '—' }}{% else %}Not set{% endif %}
             </strong>
           </div>
         </div>
 
-        <div class="stat-mini-card mb-4">
+        <div class="rounded-xl border border-stone-200 bg-white p-4 mb-4 shadow-2xs">
           <div class="flex items-center justify-between">
-            <span class="stat-mini-label">Body Mass Index (BMI)</span>
-            <span id="summary-bmi-badge" class="badge-pill badge-green">{{ p.bmi_category or "Enter height & weight" }}</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Body Mass Index (BMI)</span>
+            <span id="summary-bmi-badge" class="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold">{{ p.bmi_category or "Enter height & weight" }}</span>
           </div>
-          <p id="summary-bmi-value" class="serif m-0 mt-1 text-3xl text-[#173c2c]">{{ p.bmi if p.bmi else "—" }}</p>
+          <p id="summary-bmi-value" class="font-serif m-0 mt-1.5 text-3xl font-bold text-[#173c2c]">{{ p.bmi if p.bmi else "—" }}</p>
         </div>
 
         <div class="mb-4">
-          <p class="mb-2 text-[11px] font-bold uppercase tracking-[0.8px] text-[#6d7871]">Recorded Allergies</p>
+          <p class="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-500">Recorded Allergies</p>
           <div id="summary-allergies" class="flex flex-wrap gap-1.5">
             {% if p.allergies_list %}
               {% for item in p.allergies_list %}
-                <span class="badge-pill badge-coral">{{ item }}</span>
+                <span class="rounded-full bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 text-xs font-semibold">{{ item }}</span>
               {% endfor %}
             {% else %}
-              <span class="text-xs text-[#89938c]">No allergies listed</span>
+              <span class="text-xs text-stone-400 italic">No allergies listed</span>
             {% endif %}
           </div>
         </div>
 
         <div>
-          <p class="mb-1.5 text-[11px] font-bold uppercase tracking-[0.8px] text-[#6d7871]">About / Bio</p>
-          <p id="summary-bio" class="m-0 rounded-lg border border-[#e3e7df] bg-white p-3 text-xs leading-relaxed text-[#53645a]">
+          <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-500">About / Bio</p>
+          <p id="summary-bio" class="m-0 rounded-xl border border-stone-200 bg-white p-3 text-xs leading-relaxed text-stone-600 shadow-2xs">
             {{ p.bio or "Add a short bio about your food preferences, lifestyle, or health goals." }}
           </p>
         </div>

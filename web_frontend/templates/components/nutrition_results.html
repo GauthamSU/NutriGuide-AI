@@ -3,28 +3,34 @@
     {% set analysis = result.analysis %}
     {% set is_logged = logged_to_tracker or result.logged_to_tracker %}
     {% set msg_id = turn_id or result.message_id or '' %}
+    {% set macros = analysis.total_macronutrients or {} %}
 
-    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2 text-[11px] font-semibold text-[#53645a]">
-        <span class="brand-mark !h-7 !w-7 !rounded-[8px_8px_8px_2px] !text-sm">N</span>
-        <span>NutriGuide</span>
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+      <div class="flex items-center gap-2 text-xs font-semibold text-stone-600">
+        <span class="flex h-7 w-7 items-center justify-center rounded-[8px_8px_8px_2px] bg-[#245c43] text-sm font-bold text-[#d7ed9f]">N</span>
+        <span class="text-stone-800 font-bold">NutriGuide</span>
       </div>
 
-      <!-- Individual Dish Turn Action Bar: Log to Tracker & Delete Message -->
+      <!-- Turn Action Bar: Log to Tracker & Delete Message -->
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="turn-action-btn {{ 'turn-action-logged' if is_logged else 'turn-action-log' }}"
+          class="turn-action-btn {{ 'turn-action-logged inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 opacity-90 cursor-default' if is_logged else 'turn-action-log inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100/90 text-[#173c2c] border border-emerald-200 shadow-xs transition cursor-pointer' }}"
           data-log-to-tracker-btn
           data-message-id="{{ msg_id }}"
           data-conversation-id="{{ conversation_id or '' }}"
           data-meal-title="{{ analysis.meal_title or 'Analyzed Meal' }}"
+          data-calories="{{ '%.0f'|format(macros.get('calories_kcal', 0)) }}"
+          data-protein="{{ '%.1f'|format(macros.get('protein_g', 0)) }}"
+          data-carbs="{{ '%.1f'|format(macros.get('carbohydrates_g', 0)) }}"
+          data-fat="{{ '%.1f'|format(macros.get('total_fat_g', 0)) }}"
+          data-fiber="{{ '%.1f'|format(macros.get('dietary_fiber_g', 0)) }}"
           data-logged="{{ 'true' if is_logged else 'false' }}"
           {% if is_logged %}disabled{% endif %}
         >
           {% if is_logged %}
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-            <span>Logged to Tracker</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Logged to Tracker ✓</span>
           {% else %}
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>Log to Tracker</span>
@@ -33,8 +39,9 @@
 
         <button
           type="button"
-          class="turn-action-btn turn-action-delete"
+          class="turn-action-btn turn-action-delete inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl text-stone-500 hover:text-red-700 hover:bg-red-50 border border-stone-200 hover:border-red-200 transition cursor-pointer"
           data-delete-message-btn
+          data-delete-message-id="{{ msg_id }}"
           data-message-id="{{ msg_id }}"
           data-conversation-id="{{ conversation_id or '' }}"
           title="Delete this chat message"
@@ -48,14 +55,32 @@
 
     <script type="application/json" data-turn-analysis-json>{{ analysis | tojson }}</script>
 
-    <h2 class="serif mb-1 text-[25px] leading-tight">{{ analysis.meal_title or "Meal analysis" }}</h2>
-    {% if result.transcription %}<p class="mb-4 rounded-md bg-[#f0f4ed] p-3 text-xs leading-relaxed text-[#53645a]"><strong>AI audio transcription:</strong> {{ result.transcription }}</p>{% endif %}
-    {% if analysis.recognized_input_summary %}<p class="mb-5 text-sm leading-relaxed text-[#6d7871]">{{ analysis.recognized_input_summary }}</p>{% endif %}
-    {% set macros = analysis.total_macronutrients or {} %}
-    <div class="mb-4 rounded-xl border border-[#dfe6dc] bg-white p-4 sm:p-5">
-      <p class="mb-1 text-[10px] font-bold uppercase tracking-[1px] text-[#6d7871]">Total calories</p>
-      <p class="serif mb-4 text-[36px] leading-none text-[#173c2c]">{{ "%.0f"|format(macros.get("calories_kcal", 0)) }} <span class="font-sans text-sm font-medium text-[#6d7871]">kcal</span></p>
-      <h3 class="mb-3 text-xs font-bold">Total macronutrients</h3>
+    <h2 class="font-serif mb-1 text-[24px] sm:text-[27px] font-bold text-[#173c2c] leading-tight">{{ analysis.meal_title or "Meal analysis" }}</h2>
+    {% if result.transcription %}
+      <p class="mb-3 rounded-xl bg-emerald-50/80 border border-emerald-100 p-3 text-xs leading-relaxed text-[#245c43]">
+        <strong class="font-bold">AI audio transcription:</strong> {{ result.transcription }}
+      </p>
+    {% endif %}
+    {% if analysis.recognized_input_summary %}
+      <p class="mb-4 text-xs sm:text-sm leading-relaxed text-stone-600">{{ analysis.recognized_input_summary }}</p>
+    {% endif %}
+
+    <!-- Nutrients Card -->
+    <div class="mb-5 rounded-2xl border border-stone-200 bg-white p-4 sm:p-6 shadow-xs">
+      <div class="flex items-baseline justify-between border-b border-stone-100 pb-3 mb-4">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Calories</p>
+          <p class="font-serif text-3xl sm:text-4xl font-bold text-[#173c2c] leading-none mt-1">
+            {{ "%.0f"|format(macros.get("calories_kcal", 0)) }} <span class="font-sans text-sm font-medium text-stone-500">kcal</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-stone-500">
+          <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+          <span>Verified IFCT Data</span>
+        </div>
+      </div>
+
+      <h3 class="mb-3 text-xs font-bold uppercase tracking-wide text-stone-700">Total Macronutrients</h3>
       <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
         {% for key, label, unit in [
           ("protein_g", "Protein", "g"),
@@ -73,39 +98,70 @@
           ("sodium_mg", "Sodium", "mg"),
           ("water_g", "Water", "g")
         ] %}
-          <div class="flex justify-between gap-2 border-b border-[#edf0eb] py-1.5 text-xs"><span class="text-[#6d7871]">{{ label }}</span><strong class="whitespace-nowrap">{{ "%.1f"|format(macros.get(key) or 0) }} {{ unit }}</strong></div>
+          <div class="flex justify-between items-center gap-2 border-b border-stone-100 py-1.5 text-xs">
+            <span class="text-stone-500">{{ label }}</span>
+            <strong class="whitespace-nowrap font-bold text-stone-900">{{ "%.1f"|format(macros.get(key) or 0) }} {{ unit }}</strong>
+          </div>
         {% endfor %}
       </div>
+
       {% set micronutrients = analysis.total_micronutrients or {} %}
-      <div class="mt-5 border-t border-[#e3e7df] pt-4">
-        <h3 class="mb-3 text-xs font-bold">Total micronutrients</h3>
+      <div class="mt-5 border-t border-stone-100 pt-4">
+        <h3 class="mb-2 text-xs font-bold uppercase tracking-wide text-stone-700">Total Micronutrients</h3>
         {% for category, label in [("vitamins", "Vitamins"), ("minerals", "Minerals")] %}
           {% set nutrients = micronutrients.get(category) or [] %}
-          <h4 class="mb-2 mt-3 text-[10px] font-bold uppercase tracking-[.7px] text-[#6d7871]">{{ label }}</h4>
+          <h4 class="mb-2 mt-3 text-[10px] font-bold uppercase tracking-wider text-stone-500">{{ label }}</h4>
           {% if nutrients %}
             <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-              {% for nutrient in nutrients %}<div class="flex justify-between gap-2 border-b border-[#edf0eb] py-1.5 text-xs"><span class="text-[#6d7871]">{{ nutrient.name }}</span><strong class="whitespace-nowrap">{{ "%.2f"|format(nutrient.amount) }} {{ nutrient.unit }}</strong></div>{% endfor %}
+              {% for nutrient in nutrients %}
+                <div class="flex justify-between items-center gap-2 border-b border-stone-100 py-1.5 text-xs">
+                  <span class="text-stone-500 truncate" title="{{ nutrient.name }}">{{ nutrient.name }}</span>
+                  <strong class="whitespace-nowrap font-semibold text-stone-800">{{ "%.2f"|format(nutrient.amount) }} {{ nutrient.unit }}</strong>
+                </div>
+              {% endfor %}
             </div>
-          {% else %}<p class="text-xs text-[#89938c]">No {{ label|lower }} totals available for this meal.</p>{% endif %}
+          {% else %}
+            <p class="text-xs text-stone-400 italic">No {{ label|lower }} totals available for this meal.</p>
+          {% endif %}
         {% endfor %}
       </div>
     </div>
-    <details class="ingredient-disclosure min-w-0 w-full max-w-full overflow-hidden rounded-lg border border-[#e3e7df] bg-white px-4 py-3">
-      <summary class="min-w-0 break-words text-xs font-semibold text-[#35433b]">Ingredients and additional details <span class="ml-1 text-[#89938c]">({{ (analysis.get("items") or [])|length }})</span></summary>
-      <div class="ingredient-disclosure-clip"><div class="ingredient-disclosure-content mt-3 min-w-0 max-w-full border-t border-[#edf0eb]">
+
+    <!-- Ingredients Disclosure -->
+    <details class="group mb-3 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xs transition">
+      <summary class="flex cursor-pointer items-center justify-between px-4 py-3 text-xs font-bold text-stone-800 hover:bg-stone-50 transition list-none">
+        <span class="flex items-center gap-2">
+          <span>Ingredients and Identified Portions</span>
+          <span class="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 font-semibold">{{ (analysis.get("items") or [])|length }} items</span>
+        </span>
+        <svg class="h-4 w-4 text-stone-400 transition transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="border-t border-stone-100 px-4 py-3 space-y-2.5">
         {% for item in analysis.get("items") or [] %}
-          <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[#edf0eb] py-3">
-            <div class="min-w-0 max-w-full"><span class="block break-words text-xs font-semibold">{{ item.food_name }}</span><span class="block break-words text-[10px] text-[#6d7871]">{{ item.serving_size_description }}</span>{% if not item.found_in_database %}<span class="mt-1 inline-flex rounded bg-[#f7efe0] px-1.5 py-0.5 text-[9px] text-[#976b2f]">Not in database</span>{% endif %}</div>
-            <strong class="whitespace-nowrap text-xs">{{ "%.0f"|format(item.estimated_weight_grams) }} g</strong>
+          <div class="flex items-center justify-between gap-3 border-b border-stone-100 pb-2 text-xs">
+            <div class="min-w-0 flex-1">
+              <span class="block truncate font-bold text-stone-800">{{ item.food_name }}</span>
+              <span class="block text-[11px] text-stone-500">{{ item.serving_size_description }}</span>
+              {% if not item.found_in_database %}
+                <span class="mt-0.5 inline-flex rounded bg-amber-50 px-1.5 py-0.2 text-[9px] font-semibold text-amber-800 border border-amber-200">Not in reference database</span>
+              {% endif %}
+            </div>
+            <strong class="whitespace-nowrap font-bold text-stone-700">{{ "%.0f"|format(item.estimated_weight_grams) }} g</strong>
           </div>
         {% endfor %}
-        {% for warning in result.dietary_warnings or [] %}<p class="mt-3 rounded-md bg-[#fbf7ed] p-3 text-xs leading-relaxed text-[#71592f]">{{ warning }}</p>{% endfor %}
-        {% for missing in analysis.missing_ingredients or [] %}<p class="mt-3 rounded-md bg-[#fbf7ed] p-3 text-xs leading-relaxed text-[#71592f]">No reference food match for {{ missing }}.</p>{% endfor %}
-        {% for insight in analysis.health_insights or [] %}<p class="mt-3 rounded-md bg-[#eef4f6] p-3 text-xs leading-relaxed text-[#3e6172]">{{ insight }}</p>{% endfor %}
-      </div></div>
+        {% for warning in result.dietary_warnings or [] %}
+          <p class="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 leading-relaxed">{{ warning }}</p>
+        {% endfor %}
+        {% for missing in analysis.missing_ingredients or [] %}
+          <p class="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 leading-relaxed">No reference food match for {{ missing }}.</p>
+        {% endfor %}
+        {% for insight in analysis.health_insights or [] %}
+          <p class="rounded-lg bg-sky-50 border border-sky-200 p-2.5 text-xs text-sky-900 leading-relaxed">{{ insight }}</p>
+        {% endfor %}
+      </div>
     </details>
-    <p class="mt-3 text-[10px] leading-relaxed text-[#929b94]">Values are estimates scaled from reference food data using identified portions.</p>
+    <p class="text-[10px] text-stone-400 leading-relaxed">Nutrient values are estimates scaled from reference food data using portion estimates.</p>
   {% else %}
-    <div class="rounded-lg border border-[#f1d8d1] bg-[#fff9f7] p-4 text-sm leading-relaxed text-[#9d4534]" role="alert">{{ error or "Analysis could not be completed." }}</div>
+    <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{{ error or "Analysis could not be completed." }}</div>
   {% endif %}
 </section>

@@ -1212,7 +1212,7 @@ class NutritionGroupsTests(TestCase):
         self.assertNotEqual(priv1.json()["group"]["id"], priv2.json()["group"]["id"])
 
     def test_group_membership_and_collective_nutrition_tracking(self):
-        # Alice creates a private group and adds Bob by username
+        # Alice creates a private group and invites Bob by username
         create_resp = self.client.post(
             "/api/groups",
             data={
@@ -1226,7 +1226,34 @@ class NutritionGroupsTests(TestCase):
         )
         self.assertEqual(create_resp.status_code, 200)
         group_id = create_resp.json()["group"]["id"]
-        self.assertEqual(create_resp.json()["group"]["member_count"], 2)
+        # Alice is the only active member initially; Bob has a pending invitation
+        self.assertEqual(create_resp.json()["group"]["member_count"], 1)
+
+        # Bob views his notifications to find the pending invitation
+        bob_notifs = self.client.get(
+            "/api/groups/notifications",
+            **self.bob_headers,
+        )
+        self.assertEqual(bob_notifs.status_code, 200)
+        invitations = bob_notifs.json().get("pending_invitations", [])
+        self.assertEqual(len(invitations), 1)
+        req_id = invitations[0]["id"]
+        self.assertEqual(invitations[0]["group_name"], "Spartan Squad")
+
+        # Bob accepts the invitation
+        accept_resp = self.client.post(
+            f"/api/groups/requests/{req_id}/respond",
+            data={"action": "accept"},
+            content_type="application/json",
+            **self.bob_headers,
+        )
+        self.assertEqual(accept_resp.status_code, 200)
+        self.assertEqual(accept_resp.json()["status"], "accepted")
+
+        # Now Bob is an active member
+        detail_after_accept = self.client.get(f"/api/groups/{group_id}", **self.bob_headers)
+        self.assertEqual(detail_after_accept.status_code, 200)
+        self.assertEqual(detail_after_accept.json()["group"]["member_count"], 2)
 
         # Alice logs a meal with explicit macros
         meal1 = self.client.post(
@@ -1268,6 +1295,125 @@ class NutritionGroupsTests(TestCase):
         self.assertAlmostEqual(collective["total_calories_kcal"], 1100.0, places=0)
         self.assertAlmostEqual(collective["total_protein_g"], 51.0, places=0)
         self.assertEqual(len(group_data["member_breakdown"]), 2)
+
+    def test_group_invitation_rejection(self):
+        # Alice creates a group and invites Bob
+        create_resp = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Invited Only Club",
+                "is_public": False,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        group_id = create_resp.json()["group"]["id"]
+
+        # Alice invites Bob via members endpoint
+        inv_resp = self.client.post(
+            f"/api/groups/{group_id}/members",
+            data={"identifier": "bob"},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(inv_resp.status_code, 200)
+
+        # Bob checks notifications
+        bob_notifs = self.client.get("/api/groups/notifications", **self.bob_headers).json()
+        self.assertEqual(len(bob_notifs["pending_invitations"]), 1)
+        req_id = bob_notifs["pending_invitations"][0]["id"]
+
+        # Bob rejects the invitation
+        rej_resp = self.client.post(
+            f"/api/groups/requests/{req_id}/respond",
+            data={"action": "reject"},
+            content_type="application/json",
+            **self.bob_headers,
+        )
+        self.assertEqual(rej_resp.status_code, 200)
+        self.assertEqual(rej_resp.json()["status"], "rejected")
+
+        # Verify Bob is NOT a member
+        detail_resp = self.client.get(f"/api/groups/{group_id}", **self.alice_headers).json()
+        self.assertEqual(detail_resp["group"]["member_count"], 1)
+
+    def test_user_join_request_and_admin_approval(self):
+        # Alice creates a public group
+        create_resp = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Bangalore Runners Community",
+                "description": "Public runners tracking",
+                "is_public": True,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        group_id = create_resp.json()["group"]["id"]
+
+        # Bob sends a join request to this public group
+        join_resp = self.client.post(
+            f"/api/groups/{group_id}/join",
+            **self.bob_headers,
+        )
+        self.assertEqual(join_resp.status_code, 200)
+        self.assertTrue(join_resp.json()["group"]["has_pending_join_request"])
+        self.assertFalse(join_resp.json()["group"]["is_member"])
+
+        # Alice checks her admin notifications
+        alice_notifs = self.client.get("/api/groups/notifications", **self.alice_headers).json()
+        admin_reqs = alice_notifs["admin_pending_requests"]
+        self.assertEqual(len(admin_reqs), 1)
+        self.assertEqual(admin_reqs[0]["username"], "bob")
+        req_id = admin_reqs[0]["id"]
+
+        # Alice approves Bob's join request
+        approve_resp = self.client.post(
+            f"/api/groups/requests/{req_id}/respond",
+            data={"action": "approve"},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(approve_resp.status_code, 200)
+        self.assertEqual(approve_resp.json()["status"], "accepted")
+
+        # Now Bob is an active member of the group
+        bob_detail = self.client.get(f"/api/groups/{group_id}", **self.bob_headers).json()
+        self.assertTrue(bob_detail["group"]["is_member"])
+        self.assertEqual(bob_detail["group"]["member_count"], 2)
+
+    def test_user_join_request_and_admin_rejection(self):
+        # Alice creates a public group
+        create_resp = self.client.post(
+            "/api/groups",
+            data={
+                "name": "Strict Fitness Cohort",
+                "is_public": True,
+            },
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        group_id = create_resp.json()["group"]["id"]
+
+        # Bob requests to join
+        self.client.post(f"/api/groups/{group_id}/join", **self.bob_headers)
+
+        # Alice rejects
+        alice_notifs = self.client.get("/api/groups/notifications", **self.alice_headers).json()
+        req_id = alice_notifs["admin_pending_requests"][0]["id"]
+        rej_resp = self.client.post(
+            f"/api/groups/requests/{req_id}/respond",
+            data={"action": "reject"},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(rej_resp.status_code, 200)
+        self.assertEqual(rej_resp.json()["status"], "rejected")
+
+        # Bob is NOT a member
+        bob_detail = self.client.get(f"/api/groups/{group_id}", **self.bob_headers).json()
+        self.assertFalse(bob_detail["group"]["is_member"])
 
 
 class ExplicitTrackerAndDeletionTests(TestCase):
@@ -1577,8 +1723,12 @@ class WebFrontendTemplatesTests(SimpleTestCase):
         groups_ctx = build_page_context("/groups", current_user=mock_user)
         groups_html = render_template("pages/groups.html", groups_ctx)
         self.assertIn("create-group-modal", groups_html)
-        self.assertIn("group-detail-modal", groups_html)
         self.assertIn("public-groups-search", groups_html)
+
+        group_detail_ctx = build_page_context("/groups/test-grp-1", current_user=mock_user)
+        group_detail_ctx["group"] = {"id": "test-grp-1", "name": "Runners", "collective": {}, "recent_meals": [], "members": []}
+        group_detail_html = render_template("pages/group_detail.html", group_detail_ctx)
+        self.assertIn("group-page-log-meal-form", group_detail_html)
 
         # 4. Tracker page (Daily / Weekly / Monthly tabs + Complete Nutrient Breakdown)
         tracker_ctx = build_page_context("/tracker", current_user=mock_user)

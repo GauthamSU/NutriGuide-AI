@@ -10,3 +10,4 @@ node_modules/
 chat_history.sqlite3
 core_app.sqlite3
 media/
+prompt_for_improvements.txt

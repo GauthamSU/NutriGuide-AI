@@ -1,0 +1,11 @@
+{
+  "files": {
+    "/src/ui.py": "./ui.py",
+    "/src/auth.py": "./auth.py",
+    "/src/profile.py": "./profile.py",
+    "/src/tracker.py": "./tracker.py",
+    "/src/meal_planner.py": "./meal_planner.py",
+    "/src/groups.py": "./groups.py",
+    "/src/chat.py": "./chat.py"
+  }
+}

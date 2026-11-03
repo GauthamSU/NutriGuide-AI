@@ -1,0 +1,504 @@
+<main class="page-scroll min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10"
+  data-page="group-detail" data-group-id="{{ group.id if group else current_group_id }}">
+  <div class="mx-auto w-full max-w-[1240px] space-y-7">
+
+    {% if group_error %}
+    <div class="rounded-2xl border border-[#f1d8d1] bg-[#fff9f7] p-8 text-center shadow-xs">
+      <h2 class="font-serif m-0 text-2xl text-[#9d4534]">Could not open group</h2>
+      <p class="m-0 mt-2 text-sm text-[#6d7871]">{{ group_error }}</p>
+      <div class="mt-5">
+        <a href="/groups" hx-get="/groups" hx-select="main" hx-target="#chat-view" hx-swap="innerHTML"
+          hx-push-url="/groups" class="btn-primary !py-2.5 !px-5 !text-xs font-bold">
+          ← Back to Groups Directory
+        </a>
+      </div>
+    </div>
+    {% elif group %}
+
+    <!-- Discord / WhatsApp Community Header Banner -->
+    <div class="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-xs mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div class="flex items-start md:items-center gap-4 min-w-0">
+          <!-- Community Initial Icon Avatar -->
+          <div class="h-16 w-16 rounded-2xl bg-[#245c43] text-white flex items-center justify-center font-bold text-2xl flex-none shadow-xs">
+            {{ group.name[:2]|upper }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              {% if group.is_public %}
+              <span class="badge-pill badge-green !py-0.5 !px-2.5 !text-xs font-bold">Public Community</span>
+              {% else %}
+              <span class="badge-pill badge-amber !py-0.5 !px-2.5 !text-xs font-bold">Private Group</span>
+              {% endif %}
+
+              {% if group.is_admin %}
+              <span class="badge-pill badge-blue !py-0.5 !px-2.5 !text-xs font-bold">You are Admin ★</span>
+              {% elif group.is_member %}
+              <span class="badge-pill badge-green !py-0.5 !px-2.5 !text-xs font-bold">Member ✓</span>
+              {% endif %}
+
+              <span class="text-xs text-[#53645a] font-medium">Created by <strong class="text-[#173c2c]">@{{
+                  group.created_by }}</strong></span>
+            </div>
+
+            <h1 class="font-serif m-0 text-2xl sm:text-3xl font-normal text-[#173c2c] truncate">{{ group.name }}</h1>
+            <p class="m-0 mt-1.5 text-xs sm:text-sm text-[#53645a] leading-relaxed max-w-2xl">
+              {{ group.description or "Shared collective nutrition group for tracking meals, macros, and healthy
+              lifestyle habits together." }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 self-start md:self-auto flex-none">
+          <a href="/groups" hx-get="/groups" hx-select="main" hx-target="#chat-view" hx-swap="innerHTML"
+            hx-push-url="/groups" hx-indicator="#chat-loading"
+            class="btn-secondary !py-2.5 !px-4 !text-xs font-semibold" title="View all communities">
+            <span>← Directory</span>
+          </a>
+          <button type="button" class="btn-primary !py-2.5 !px-5 !text-xs font-bold jump-to-post-meal-btn">
+            <span>+ Log Meal to Group</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collective Nutrition Stats Banner -->
+    <div>
+      <div class="mb-3.5 flex items-center justify-between">
+        <h3 class="m-0 text-xs font-bold uppercase tracking-[1px] text-[#245c43] flex items-center gap-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          <span>Collective Group Nutrition Totals</span>
+        </h3>
+        <span class="text-xs font-semibold text-[#53645a]">
+          {{ group.collective.total_meals_count }} meals logged across {{ group.collective.total_members }} members
+        </span>
+      </div>
+      <div class="collective-stats-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-6">
+        <div class="collective-stat-card collective-stat-primary flex flex-col justify-between p-4 rounded-2xl border border-emerald-300 bg-gradient-to-br from-[#245c43] to-[#173c2c] text-white shadow-xs">
+          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-emerald-200">Collective Calories</span>
+          <strong class="font-serif collective-stat-value text-2xl sm:text-3xl font-bold my-1 leading-tight text-white">{{ (group.collective.total_calories_kcal or 0)|round|int }}
+            <small class="text-xs font-normal text-emerald-200">kcal</small></strong>
+          <span class="collective-stat-sub text-[11px] text-emerald-200">{{ (group.collective.average_calories_per_member or 0)|round|int }} kcal avg / member</span>
+        </div>
+        <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
+          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Protein</span>
+          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_protein_g or 0 }}
+            <small class="text-xs font-normal text-stone-500">g</small></strong>
+          <span class="collective-stat-sub text-[11px] text-stone-500">Muscle &amp; recovery</span>
+        </div>
+        <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
+          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Carbs</span>
+          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_carbohydrates_g or 0 }}
+            <small class="text-xs font-normal text-stone-500">g</small></strong>
+          <span class="collective-stat-sub text-[11px] text-stone-500">Daily energy fuel</span>
+        </div>
+        <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
+          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Fat</span>
+          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_fat_g or 0 }} <small class="text-xs font-normal text-stone-500">g</small></strong>
+          <span class="collective-stat-sub text-[11px] text-stone-500">Essential lipids</span>
+        </div>
+        <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
+          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Dietary Fiber</span>
+          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_fiber_g or 0 }}
+            <small class="text-xs font-normal text-stone-500">g</small></strong>
+          <span class="collective-stat-sub text-[11px] text-stone-500">Digestive wellness</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Workspace: Balanced 2-Column Responsive Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left Column: Multimodal Meal Composer & Feed Stream -->
+      <div class="lg:col-span-8 space-y-6 sm:space-y-7 min-w-0">
+
+        <!-- Post / Log Meal Composer Card -->
+        <div id="group-meal-composer" class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#245c43]" aria-hidden="true"></span>
+            <h3 class="m-0 text-base font-bold text-[#173c2c]">Share a Meal with {{ group.name }}</h3>
+          </div>
+          <p class="m-0 mb-4 text-xs text-[#53645a] leading-relaxed">
+            Describe your meal, attach a photo, or record a voice note. NutriGuide AI will automatically compute
+            calories and macronutrients from the food database.
+          </p>
+
+          <form id="group-page-log-meal-form" class="space-y-4" novalidate>
+            <input type="hidden" name="group_id" value="{{ group.id }}">
+
+            <!-- Hidden File Inputs for Multimodal Capture -->
+            <input id="group-meal-image" name="image" type="file" accept="image/jpeg,image/png,image/webp"
+              class="hidden">
+            <input id="group-meal-voice" name="voice" type="file" accept="audio/wav,audio/mpeg" class="hidden">
+
+            <!-- Text Description Area -->
+            <div>
+              <label for="group-meal-title" class="form-label !text-xs font-bold text-[#173c2c] mb-1.5 block">
+                Meal Description <span class="text-[#c65a42]">*</span>
+              </label>
+              <textarea id="group-meal-title" name="meal_title" rows="2"
+                placeholder="What did you eat? e.g. 2 chapatis with dal tadka, cucumber salad and a bowl of curd..."
+                class="w-full rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all resize-y" required></textarea>
+            </div>
+
+            <!-- Meal Time and Multimodal Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div class="flex items-center gap-2">
+                <label for="group-meal-type" class="text-xs font-bold text-[#173c2c]">Meal Time:</label>
+                <select id="group-meal-type" name="meal_type"
+                  class="form-input !py-1.5 !px-3 !text-xs !bg-[#fafbf9] !w-auto">
+                  <option value="Breakfast">Breakfast</option>
+                  <option value="Lunch" selected>Lunch</option>
+                  <option value="Snacks">Snacks</option>
+                  <option value="Dinner">Dinner</option>
+                </select>
+              </div>
+
+              <!-- Media Attachment Controls -->
+              <div class="flex items-center gap-2">
+                <button type="button" id="group-meal-attach-btn" class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer" title="Attach meal photo">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                  <span>+ Photo</span>
+                </button>
+
+                <button type="button" id="group-meal-mic-btn" class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer" title="Record voice note">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                  <span id="group-meal-mic-label">Record Voice</span>
+                </button>
+
+                <button type="button" id="group-meal-audio-upload-btn" class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                  title="Upload audio file">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                  <span>Upload Audio</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Voice Recording Wave Indicator (Hidden by default) -->
+            <div id="group-meal-recording-status"
+              class="recording-wave hidden items-center gap-[3px] px-3 py-2 rounded-lg bg-[#fdf2f0] border border-[#f1b3a8] text-xs font-semibold text-[#c65a42]"
+              style="display: none;">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <span class="ml-2 font-bold">Recording voice note... click "Stop Recording" when finished</span>
+            </div>
+
+            <!-- Attachment Chips Preview Container -->
+            <div id="group-meal-attachment-chips" class="flex flex-wrap items-center gap-2 pt-1 empty:hidden"></div>
+
+            <!-- AI Automatic Database Calculation Banner -->
+            <div
+              class="flex items-center gap-2.5 rounded-xl bg-[#f4f8f2] border border-[#d2ded1] px-4 py-3 text-xs text-[#245c43] font-medium leading-relaxed">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" class="flex-none" aria-hidden="true">
+                <path
+                  d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+              </svg>
+              <span><strong>AI Database Resolution:</strong> Calories, proteins, carbs, fats, and fiber are calculated
+                automatically from the nutrition database. No manual calorie typing required.</span>
+            </div>
+
+            <!-- Feedback Alert Container -->
+            <div id="group-meal-feedback" class="hidden rounded-lg p-3 text-xs font-medium"></div>
+
+            <!-- Submit Row -->
+            <div class="flex items-center justify-between pt-3 border-t border-[#f0f3ee]">
+              <span class="text-xs text-[#6d7871]">Shares directly to {{ group.name }}'s collective log.</span>
+              <button type="submit" id="group-page-log-meal-btn" class="btn-primary !py-2.5 !px-5 !text-xs font-bold">
+                <span>+ Post Meal to Group</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Chronological Meal Feed Stream -->
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="m-0 text-sm font-bold text-[#173c2c] flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18" />
+                <path d="M9 21V9" />
+              </svg>
+              <span>Recent Meals Feed</span>
+            </h3>
+            <span class="badge-pill badge-green !py-0.5 !px-2.5 !text-xs font-bold">{{ group.recent_meals|length }}
+              logged</span>
+          </div>
+
+          <div id="group-feed-stream" class="space-y-4 sm:space-y-5">
+            {% if group.recent_meals %}
+            {% for meal in group.recent_meals %}
+            <article class="feed-meal-card rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
+              <!-- Header: Author Avatar & Metadata -->
+              <div class="flex items-center gap-3">
+                <div class="feed-user-avatar h-9 w-9 rounded-full bg-emerald-100 text-[#173c2c] border border-emerald-200 flex items-center justify-center text-xs font-bold flex-none overflow-hidden">
+                  {% set m_user_name = meal.member_name or (meal.user.name if meal.user is defined and meal.user else
+                  '') or meal.username or (meal.user.username if meal.user is defined and meal.user else '') or 'Member'
+                  %}
+                  {% set m_user_handle = meal.username or (meal.user.username if meal.user is defined and meal.user else
+                  '') or m_user_name %}
+                  {% set m_user_pic = meal.profile_picture or (meal.user.profile_picture if meal.user is defined and
+                  meal.user else None) %}
+                  {% if m_user_pic %}
+                  <img src="{{ m_user_pic }}" alt="{{ m_user_name }}" class="h-full w-full object-cover">
+                  {% else %}
+                  <span>{{ m_user_name[:2]|upper }}</span>
+                  {% endif %}
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <strong class="text-sm font-bold text-[#173c2c]">{{ m_user_name }}</strong>
+                    <span class="text-xs font-medium text-[#53645a]">@{{ m_user_handle }}</span>
+                    <span class="badge-pill badge-green !py-0.5 !px-2 !text-xs font-semibold">{{ meal.meal_type or
+                      "Meal" }}</span>
+                  </div>
+                </div>
+
+                <span class="text-xs text-[#6d7871] font-medium flex-none">
+                  {{ meal.created_at[:16]|replace('T', ' ') }}
+                </span>
+              </div>
+
+              <!-- Meal Title -->
+              <div>
+                <h4 class="m-0 text-base font-bold text-[#173c2c] leading-snug">{{ meal.meal_title }}</h4>
+                {% if meal.serving_notes %}
+                <div
+                  class="mt-2.5 text-xs text-[#4a5750] bg-[#f8faf7] p-3 rounded-xl border border-[#e4ebe2] leading-relaxed">
+                  {{ meal.serving_notes }}
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- Clean Professional Macronutrient Badges Grid (No Emojis) -->
+              <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-stone-100">
+                <span class="feed-macro-badge calories px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-[#173c2c] border border-emerald-200">{{ (meal.calories_kcal or 0)|round|int }} kcal</span>
+                <span class="feed-macro-badge protein px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">Protein: {{ meal.protein_g }}g</span>
+                <span class="feed-macro-badge carbs px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">Carbs: {{ meal.carbohydrates_g }}g</span>
+                <span class="feed-macro-badge fat px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">Fat: {{ meal.total_fat_g }}g</span>
+                {% if meal.dietary_fiber_g %}
+                <span class="feed-macro-badge fiber px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">Fiber: {{ meal.dietary_fiber_g }}g</span>
+                {% endif %}
+              </div>
+            </article>
+            {% endfor %}
+            {% else %}
+            <div class="rounded-2xl border border-dashed border-[#d5ded4] bg-white p-8 text-center shadow-xs">
+              <div
+                class="inline-grid h-12 w-12 place-items-center rounded-full bg-[#f4f8f2] text-[#245c43] mb-2 mx-auto">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path
+                    d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
+                  <path d="M10 2c1 .5 2 2 2 5" />
+                </svg>
+              </div>
+              <h4 class="font-serif m-0 text-lg text-[#173c2c]">No meals logged in this group yet</h4>
+              <p class="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[#6d7871]">
+                Be the first to share what you ate today! Post a meal using the composer above to start building
+                collective nutrition insights for {{ group.name }}.
+              </p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Sidebar (Community Members Roster, Admin Controls, Info) -->
+      <div class="lg:col-span-4 space-y-6 sm:space-y-7 min-w-0">
+
+        {% if group.is_admin %}
+        <!-- Admin Control Center Panel -->
+        <div class="rounded-2xl border border-[#c8d6ea] bg-[#f4f7fc] p-5 sm:p-6 shadow-xs space-y-4">
+          <div class="flex items-center justify-between border-b border-[#dce5f2] pb-2.5">
+            <h3 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#1f4270] flex items-center gap-1.5">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+              </svg>
+              <span>Admin Control Center</span>
+            </h3>
+            <span class="badge-pill badge-blue !py-0.5 !px-2.5 !text-xs font-bold">Manager</span>
+          </div>
+
+          <!-- 1. Invite Member by Username or Email -->
+          <div>
+            <h4 class="m-0 mb-1 text-xs font-bold text-[#173c2c]">Invite Member to Group</h4>
+            <p class="m-0 mb-2 text-xs text-[#53645a]">Send an invitation directly to a user by username or email:</p>
+            <form id="group-page-add-member-form" class="space-y-2">
+              <input type="hidden" name="group_id" value="{{ group.id }}">
+              <div class="flex items-center gap-2">
+                <input type="text" name="identifier" id="group-invite-identifier" placeholder="Enter username or email…"
+                  class="form-input !py-2 !text-xs !bg-white flex-1" required>
+                <button type="submit" id="group-page-invite-btn"
+                  class="btn-primary !py-2 !px-4 !text-xs font-bold flex-none">
+                  <span>+ Invite</span>
+                </button>
+              </div>
+              <div id="group-invite-feedback" class="hidden rounded-lg p-2.5 text-xs font-medium"></div>
+            </form>
+          </div>
+
+          <!-- 2. Pending Join Requests for this Group -->
+          {% if group.pending_join_requests %}
+          <div class="pt-2.5 border-t border-[#dce5f2]">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="m-0 text-xs font-bold text-[#1f4270]">
+                Pending Join Requests ({{ group.pending_join_requests|length }})
+              </h4>
+              <span class="badge-pill badge-amber !py-0.5 !px-2 !text-xs font-bold">Awaiting Approval</span>
+            </div>
+            <div class="space-y-2">
+              {% for req in group.pending_join_requests %}
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-white border border-[#d6e0ef]">
+                <div class="min-w-0 flex-1">
+                  <strong class="block truncate text-xs font-bold text-[#173c2c]">@{{ req.username }}</strong>
+                  <small class="block text-xs text-[#6d7871]">{{ req.name or "User" }}</small>
+                </div>
+                <div class="flex items-center gap-1.5 flex-none">
+                  <button type="button" data-request-action="accept" data-request-id="{{ req.id }}"
+                    class="btn-primary !py-1.5 !px-3 !text-xs font-bold">
+                    ✓ Approve
+                  </button>
+                  <button type="button" data-request-action="reject" data-request-id="{{ req.id }}"
+                    class="btn-secondary !py-1.5 !px-2.5 !text-xs font-bold text-[#9d4534]">
+                    ✕ Decline
+                  </button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- 3. Sent Invitations Pending Acceptance -->
+          {% if group.pending_invitations %}
+          <div class="pt-2.5 border-t border-[#dce5f2]">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="m-0 text-xs font-bold text-[#245c43]">
+                Sent Invitations ({{ group.pending_invitations|length }})
+              </h4>
+              <span class="badge-pill badge-green !py-0.5 !px-2 !text-xs font-bold">Invited</span>
+            </div>
+            <div class="space-y-1.5">
+              {% for inv in group.pending_invitations %}
+              <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#e2e8df]">
+                <span class="truncate text-xs font-medium text-[#173c2c]">@{{ inv.username }}</span>
+                <button type="button" data-request-action="cancel" data-request-id="{{ inv.id }}"
+                  class="btn-secondary !py-1 !px-2.5 !text-xs font-semibold text-[#9d4534]">
+                  Cancel
+                </button>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+        {% endif %}
+
+        <!-- Members Roster Card -->
+        <div class="rounded-2xl border border-[#dce2da] bg-white p-5 sm:p-6 shadow-xs">
+          <div class="flex items-center justify-between border-b border-[#e9ede6] pb-3 mb-3.5 ">
+            <h3 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#245c43] flex items-center gap-1.5">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <span>Community Members ({{ group.members|length }})</span>
+            </h3>
+          </div>
+
+          <!-- Members List with Clean Sized Avatars -->
+          <div class="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+            {% for m in group.members %}
+            <div
+              class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#f6f9f5] border border-transparent hover:border-[#e2ebd0] transition">
+              <div class="member-roster-avatar h-8 w-8 rounded-full bg-emerald-100 text-[#173c2c] border border-emerald-200 flex items-center justify-center text-xs font-bold flex-none overflow-hidden">
+                {% if m.profile_picture %}
+                <img src="{{ m.profile_picture }}" alt="{{ m.name or m.username }}" class="h-full w-full object-cover">
+                {% else %}
+                <span>{{ (m.name or m.username)[:2]|upper }}</span>
+                {% endif %}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <strong class="truncate text-xs font-bold text-[#173c2c]">{{ m.name or m.username }}</strong>
+                  {% if m.role == 'admin' %}
+                  <span class="badge-pill badge-green !py-0 !px-1.5 !text-[11px] font-bold">Admin</span>
+                  {% endif %}
+                </div>
+                <span class="block truncate text-xs text-[#6d7871]">
+                  @{{ m.username }} · Joined {{ m.joined_at[:10] }}
+                </span>
+              </div>
+              <div class="text-right flex-none">
+                <strong class="block text-xs font-bold text-[#245c43]">{{ ((m.nutrition.calories_kcal if m.nutrition
+                  else 0) or 0)|round|int }} kcal</strong>
+                <span class="block text-xs text-[#6d7871]">{{ m.nutrition.meals_count }} meals</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Community Guidelines / Activity Card -->
+        <div class="rounded-2xl border border-[#dce2da] bg-white p-5 sm:p-6 shadow-xs">
+          <h4 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#245c43] flex items-center gap-1.5 mb-2.5">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>About This Group</span>
+          </h4>
+          <p class="m-0 text-xs text-[#53645a] leading-relaxed mb-3.5">
+            Share your daily meals with the group to contribute to collective totals. AI verifies every meal against
+            IFCT 2017 &amp; USDA databases.
+          </p>
+          <div class="space-y-2 text-xs text-[#6d7871]">
+            <div class="flex items-center justify-between py-1.5 border-t border-[#f0f3ee]">
+              <span>Visibility</span>
+              <strong class="text-[#173c2c] font-semibold">{{ "Public" if group.is_public else "Private" }}</strong>
+            </div>
+            <div class="flex items-center justify-between py-1.5 border-t border-[#f0f3ee]">
+              <span>Created By</span>
+              <strong class="text-[#173c2c] font-semibold">@{{ group.created_by }}</strong>
+            </div>
+            <div class="flex items-center justify-between py-1.5 border-t border-[#f0f3ee]">
+              <span>Total Meals Logged</span>
+              <strong class="text-[#245c43] font-bold">{{ group.collective.total_meals_count }}</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+</main>

@@ -1,12 +1,43 @@
 {% set resolved_turn_id = turn_id or (result.message_id if result else '') %}
 <article class="mx-auto mb-8 w-full min-w-0 max-w-[760px] transition-all duration-300" data-conversation-turn {% if resolved_turn_id %}data-message-id="{{ resolved_turn_id }}" id="turn-{{ resolved_turn_id }}"{% endif %} {% if conversation_id %}data-conversation-id="{{ conversation_id }}"{% endif %}>
-  {% if include_user %}<div class="user-turn min-w-0 text-sm leading-relaxed">
-    {% if user_text %}<p class="m-0 break-words">{{ user_text }}</p>{% endif %}
-    {% if transcription %}<p class="mt-2 border-l-2 border-[#91a48f] pl-2 text-xs text-[#53645a]"><span class="font-semibold">AI transcription:</span> {{ transcription }}</p>{% endif %}
-    {% if image_name or voice_name %}<div class="mt-2 flex min-w-0 flex-wrap gap-1.5">{% if image_name %}<span class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/75 px-2.5 py-1 text-[10px]"><span aria-hidden="true">▧</span><span class="max-w-[200px] truncate">{{ image_name }}</span></span>{% endif %}{% if voice_name %}<span class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/75 px-2.5 py-1 text-[10px]"><span aria-hidden="true">♫</span><span class="max-w-[200px] truncate">Voice note</span></span>{% endif %}</div>{% endif %}
-    {% if image_url %}<img src="{{ image_url }}" alt="Attached meal photo" class="submitted-image-preview">{% endif %}
-    {% if audio_url %}<audio class="mt-2 block max-w-full" controls preload="none" src="{{ audio_url }}">Your browser does not support audio playback.</audio>{% endif %}
-  </div>{% endif %}
-  {% include "components/nutrition_results.html" %}
-  {% if history_oob %}{% include "components/history_items.html" %}{% endif %}
+  {% if include_user %}
+    <div class="ml-auto mb-4 max-w-[88%] sm:max-w-[80%] rounded-2xl rounded-tr-xs bg-[#eaf4ec] border border-[#cce5d2] p-4 text-sm leading-relaxed text-stone-900 shadow-2xs">
+      {% if user_text %}
+        <p class="m-0 break-words font-medium">{{ user_text }}</p>
+      {% endif %}
+      {% if transcription %}
+        <p class="mt-2 border-l-2 border-[#245c43] pl-2 text-xs text-[#245c43]">
+          <span class="font-bold">AI transcription:</span> {{ transcription }}
+        </p>
+      {% endif %}
+      {% if image_name or voice_name %}
+        <div class="mt-2 flex min-w-0 flex-wrap gap-1.5">
+          {% if image_name %}
+            <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/80 border border-emerald-200 px-2.5 py-1 text-[11px] font-medium text-emerald-900">
+              <span aria-hidden="true">📷</span>
+              <span class="max-w-[200px] truncate">{{ image_name }}</span>
+            </span>
+          {% endif %}
+          {% if voice_name %}
+            <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/80 border border-emerald-200 px-2.5 py-1 text-[11px] font-medium text-emerald-900">
+              <span aria-hidden="true">🎙️</span>
+              <span class="max-w-[200px] truncate">Voice note</span>
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if image_url %}
+        <img src="{{ image_url }}" alt="Attached meal photo" class="mt-2.5 max-h-56 rounded-xl border border-emerald-200 object-cover shadow-xs">
+      {% endif %}
+      {% if audio_url %}
+        <audio class="mt-2.5 block w-full max-w-xs h-8" controls preload="none" src="{{ audio_url }}">Your browser does not support audio playback.</audio>
+      {% endif %}
+    </div>
+  {% endif %}
+  <div class="bg-white rounded-2xl border border-stone-200/90 p-5 sm:p-6 shadow-sm">
+    {% include "components/nutrition_results.html" %}
+  </div>
+  {% if history_oob %}
+    {% include "components/history_items.html" %}
+  {% endif %}
 </article>

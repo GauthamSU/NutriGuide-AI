@@ -116,7 +116,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
         route_path = parsed_url.path.rstrip("/") or "/"
 
         if route_path == "/meal-plans/history":
-            owner_id = self._get_owner_id()
+            owner_id = self._get_effective_owner_id()
             try:
                 with httpx.Client(timeout=30.0) as client:
                     response = client.get(
@@ -184,6 +184,8 @@ class FrontendHandler(BaseHTTPRequestHandler):
             query_params = parse_qs(parsed_url.query)
             period = (query_params.get("period") or ["daily"])[-1]
             params = {"owner_id": owner_id, "period": period}
+            if query_params.get("date"):
+                params["date"] = query_params["date"][-1]
             if token:
                 params["token"] = token
             try:
@@ -279,6 +281,38 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 else "pages/analyze.html"
             )
             self._send_template(template, context)
+        elif route_path.startswith("/groups/") and route_path != "/groups" and not route_path.endswith("/data"):
+            owner_id = self._get_owner_id()
+            token = self._get_auth_token()
+            group_id = route_path.removeprefix("/groups/").strip("/")
+            context = self._page_context(owner_id, conversation_id=str(uuid.uuid4()), current_path=route_path)
+            context["current_group_id"] = str(group_id)
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    g_params = {"owner_id": owner_id}
+                    if token:
+                        g_params["token"] = token
+                    response = client.get(
+                        f"{API_BASE_URL}/api/groups/{group_id}",
+                        params=g_params,
+                    )
+                if response.is_success:
+                    g_data = response.json() or {}
+                    if "collective_nutrition" in g_data and "collective" not in g_data:
+                        g_data["collective"] = g_data["collective_nutrition"]
+                    context["group"] = g_data
+                else:
+                    context["group_error"] = (response.json() or {}).get("detail", "Could not load this group.")
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Could not load group page group_id=%s", group_id)
+                context["group_error"] = "Could not load this group. Please try again."
+
+            template = (
+                "components/group_detail_view.html"
+                if self.headers.get("HX-Request", "").lower() == "true"
+                else "pages/group_detail.html"
+            )
+            self._send_template(template, context)
         elif route_path.startswith("/chat-assets/"):
             self._send_chat_asset(route_path)
         elif route_path.startswith("/api/profile/avatar/") or route_path.startswith("/profile-assets/"):
@@ -293,6 +327,10 @@ class FrontendHandler(BaseHTTPRequestHandler):
             self._send_asset(route_path)
         elif route_path.startswith("/src/"):
             self._send_asset(route_path)
+        elif route_path in {"/pyscript.json", "/pyscript.toml"}:
+            self._send_asset(f"/src{route_path}")
+        elif route_path.endswith(".py"):
+            self._send_asset(f"/src/{route_path.split('/')[-1]}")
         else:
             self._send_template("pages/error.html", {"message": "Page not found."}, status=404)
 
@@ -415,7 +453,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
         # ─── Deletion Proxy Routes (Meal Plans, Conversations, Chat Messages) ─
         if route_path.startswith("/meal-plans/") and route_path.endswith("/delete"):
             meal_plan_id = route_path.removeprefix("/meal-plans/").removesuffix("/delete").strip("/")
-            owner_id = self._get_owner_id()
+            owner_id = self._get_effective_owner_id()
             try:
                 with httpx.Client(timeout=30.0) as client:
                     response = client.post(
@@ -438,6 +476,12 @@ class FrontendHandler(BaseHTTPRequestHandler):
                         conv_id, _, msg_id = parts
                         response = client.post(
                             f"{API_BASE_URL}/api/chat-history/conversations/{conv_id}/messages/{msg_id}/delete",
+                            params={"owner_id": owner_id},
+                        )
+                    elif len(parts) == 2 and parts[0] == "messages":
+                        msg_id = parts[1]
+                        response = client.post(
+                            f"{API_BASE_URL}/api/chat-history/messages/{msg_id}/delete",
                             params={"owner_id": owner_id},
                         )
                     elif len(parts) == 1:
@@ -511,11 +555,81 @@ class FrontendHandler(BaseHTTPRequestHandler):
 
         if route_path.startswith("/groups/") and route_path.endswith("/meals"):
             group_id = route_path.removeprefix("/groups/").removesuffix("/meals").strip("/")
-            fields, _ = self._parse_form()
-            fields["owner_id"] = self._get_owner_id()
+            fields, uploads = self._parse_form()
+            owner_id = self._get_owner_id()
             token = self._get_auth_token()
+            fields["owner_id"] = owner_id
             if token:
                 fields["token"] = token
+            meal_text = (fields.get("meal_title") or fields.get("text") or "").strip()
+
+            # If user uploaded photos or voice notes, analyze them with the multimodal AI endpoint
+            if uploads:
+                try:
+                    data = {"text": meal_text, "owner_id": owner_id}
+                    if token:
+                        data["token"] = token
+                    files = [
+                        (field, (name, content, content_type))
+                        for field, name, content_type, content in uploads
+                    ]
+                    with httpx.Client(timeout=60.0) as client:
+                        ai_resp = client.post(
+                            f"{API_BASE_URL}/api/nutrition/analyze",
+                            data=data,
+                            files=files,
+                        )
+                    if ai_resp.is_success:
+                        ai_data = ai_resp.json() or {}
+                        analysis = ai_data.get("analysis") or {}
+                        macros = analysis.get("total_macronutrients") or {}
+                        resolved_title = analysis.get("meal_title") or ai_data.get("transcription") or meal_text or "Shared Meal"
+                        fields["meal_title"] = resolved_title
+                        if macros.get("calories_kcal") is not None:
+                            fields["calories_kcal"] = macros.get("calories_kcal")
+                        if macros.get("protein_g") is not None:
+                            fields["protein_g"] = macros.get("protein_g")
+                        if macros.get("carbohydrates_g") is not None:
+                            fields["carbohydrates_g"] = macros.get("carbohydrates_g")
+                        if macros.get("total_fat_g") is not None:
+                            fields["total_fat_g"] = macros.get("total_fat_g")
+                        if macros.get("dietary_fiber_g") is not None:
+                            fields["dietary_fiber_g"] = macros.get("dietary_fiber_g")
+                        summary = analysis.get("recognized_input_summary") or ""
+                        if summary:
+                            fields["serving_notes"] = summary
+                except Exception:
+                    logger.exception("AI multimodal analysis before group meal post failed")
+            elif meal_text and ("calories_kcal" not in fields or not fields.get("calories_kcal")):
+                # Pure text input: query AI text analyze endpoint so portions and food items are parsed
+                try:
+                    with httpx.Client(timeout=25.0) as client:
+                        ai_text_resp = client.post(
+                            f"{API_BASE_URL}/api/nutrition/analyze/text",
+                            json={"text": meal_text, "owner_id": owner_id},
+                        )
+                    if ai_text_resp.is_success:
+                        ai_data = ai_text_resp.json() or {}
+                        analysis = ai_data.get("analysis") or {}
+                        macros = analysis.get("total_macronutrients") or {}
+                        if analysis.get("meal_title"):
+                            fields["meal_title"] = analysis["meal_title"]
+                        if macros.get("calories_kcal") is not None:
+                            fields["calories_kcal"] = macros.get("calories_kcal")
+                        if macros.get("protein_g") is not None:
+                            fields["protein_g"] = macros.get("protein_g")
+                        if macros.get("carbohydrates_g") is not None:
+                            fields["carbohydrates_g"] = macros.get("carbohydrates_g")
+                        if macros.get("total_fat_g") is not None:
+                            fields["total_fat_g"] = macros.get("total_fat_g")
+                        if macros.get("dietary_fiber_g") is not None:
+                            fields["dietary_fiber_g"] = macros.get("dietary_fiber_g")
+                        summary = analysis.get("recognized_input_summary") or ""
+                        if summary:
+                            fields["serving_notes"] = summary
+                except Exception:
+                    logger.warning("AI text analysis fallback to IFCT DB for group meal")
+
             try:
                 with httpx.Client(timeout=30.0) as client:
                     response = client.post(
@@ -557,7 +671,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
         # ─── Meal Plan Generation (JSON or Multimodal Form) ───────────────────
         if route_path == "/meal-plans/generate":
             fields, uploads = self._parse_form()
-            owner_id = self._get_owner_id(create=True)
+            owner_id = self._get_effective_owner_id(create=True)
             submitted_owner_id = fields.get("owner_id") or owner_id
             if not fields and not uploads:
                 self._send_json({"detail": "A valid meal plan request is required."}, status=400)
@@ -789,7 +903,26 @@ class FrontendHandler(BaseHTTPRequestHandler):
         self.owner_cookie_value = owner_id
         return owner_id
 
-    def _page_context(self, owner_id, conversation_id, **context):
+    def _get_effective_owner_id(self, create=True):
+        token = self._get_auth_token()
+        owner_id = self._get_owner_id(create=create)
+        if token:
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    me_resp = client.get(f"{API_BASE_URL}/api/auth/me", params={"token": token})
+                if me_resp.is_success:
+                    user_data = (me_resp.json() or {}).get("user")
+                    if user_data and not str(user_data.get("username", "")).startswith("guest_"):
+                        if user_data.get("owner_id"):
+                            owner_id = str(user_data["owner_id"])
+                            self.owner_cookie_value = owner_id
+            except (httpx.HTTPError, ValueError):
+                pass
+        return owner_id
+
+    def _page_context(self, owner_id, conversation_id=None, **context):
+        conversation_id = conversation_id or str(uuid.uuid4())
+        context.setdefault('current_path', getattr(self, 'path', '/').split('?')[0])
         health = None
         health_url = f"{API_BASE_URL}/api/nutrition/health"
         try:
@@ -838,7 +971,8 @@ class FrontendHandler(BaseHTTPRequestHandler):
         admin_pending_requests = []
         my_pending_join_requests = []
         notifications_count = 0
-        if context.get("current_path") == "/groups":
+        # Always prefetch groups so the collapsible sidebar list is populated across all pages
+        if owner_id or token:
             try:
                 g_params = {"owner_id": owner_id}
                 if token:
@@ -1053,7 +1187,15 @@ class FrontendHandler(BaseHTTPRequestHandler):
             logger.debug("Client closed connection before response completed")
 
     def _send_template(self, template_name, context, status=200):
-        body = TEMPLATES.get_template(template_name).render(**context).encode("utf-8")
+        ctx = dict(context or {})
+        route_path = getattr(self, "path", "/").split("?")[0]
+        ctx.setdefault("current_path", route_path)
+        ctx.setdefault("my_groups", [])
+        ctx.setdefault("public_groups", [])
+        ctx.setdefault("chat_conversations", [])
+        ctx.setdefault("current_user", None)
+        ctx.setdefault("notifications_count", 0)
+        body = TEMPLATES.get_template(template_name).render(**ctx).encode("utf-8")
         self._send_html(body.decode("utf-8"), status=status)
 
     def _send_html(self, html, status=200):
@@ -1062,7 +1204,8 @@ class FrontendHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
+            # Cache-Control already sent above
             self._write_cookies()
             self.end_headers()
             self._safe_write(body)
@@ -1075,7 +1218,8 @@ class FrontendHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
+            # Cache-Control already sent above
             self._write_cookies()
             self.end_headers()
             self._safe_write(body)
@@ -1090,6 +1234,8 @@ class FrontendHandler(BaseHTTPRequestHandler):
         content_types = {
             ".css": "text/css; charset=utf-8",
             ".py": "text/plain; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
+            ".toml": "text/plain; charset=utf-8",
             ".svg": "image/svg+xml",
             ".png": "image/png",
             ".ico": "image/x-icon",
@@ -1102,6 +1248,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
             self.end_headers()
             self._safe_write(body)
         except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
