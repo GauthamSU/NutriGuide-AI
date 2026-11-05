@@ -27,7 +27,7 @@ def get_today_iso() -> str:
 def init_tracker_from_dom() -> None:
     """Load pre-rendered tracker JSON embedded in the HTML on first load."""
     global tracker_cache
-    script_el = window.document.getElementById("initial-tracker-data")
+    script_el = window.document.getElementById("initial-tracker-data") or window.document.getElementById("tracker-initial-json")
     if script_el and script_el.textContent.strip():
         try:
             tracker_cache = json.loads(script_el.textContent)
@@ -44,16 +44,18 @@ def render_tracker_period(period_key: str = None) -> None:
     if period_key:
         active_tracker_period = period_key
 
-    # Update tab buttons
+    # Update tab button visual active state
     tabs = window.document.querySelectorAll("[data-tracker-tab]")
     for i in range(tabs.length):
         btn = tabs.item(i)
         is_sel = (btn.dataset.trackerTab == active_tracker_period)
         if is_sel:
-            btn.classList.add("is-active")
+            btn.classList.add("is-active", "bg-[#173c2c]", "text-white", "font-bold", "shadow-xs")
+            btn.classList.remove("text-stone-600", "hover:text-stone-900", "hover:bg-white/70", "font-semibold")
             btn.setAttribute("aria-selected", "true")
         else:
-            btn.classList.remove("is-active")
+            btn.classList.remove("is-active", "bg-[#173c2c]", "text-white", "font-bold", "shadow-xs")
+            btn.classList.add("text-stone-600", "hover:text-stone-900", "hover:bg-white/70", "font-semibold")
             btn.setAttribute("aria-selected", "false")
 
     if not tracker_cache or not isinstance(tracker_cache, dict):
@@ -62,7 +64,7 @@ def render_tracker_period(period_key: str = None) -> None:
     periods = tracker_cache.get("periods") or {}
     period_data = periods.get(active_tracker_period)
     if not period_data:
-        return
+        period_data = tracker_cache
 
     today_str = get_today_iso()
     all_meals = period_data.get("meals") or []
@@ -73,227 +75,266 @@ def render_tracker_period(period_key: str = None) -> None:
         for m in all_meals:
             c_date = m.get("consumed_date") or ""
             is_today = bool(m.get("is_today", False))
-            # Include meal ONLY if consumed_date matches today's date or is_today is True
-            if c_date == today_str or (not c_date and is_today):
+            if is_today or c_date == today_str or not c_date:
                 meals.append(m)
+        if not meals and all_meals:
+            meals = all_meals
     else:
         meals = all_meals
 
-    macros = period_data.get("macronutrients") or {}
-    micros = period_data.get("micronutrients") or {"vitamins": [], "minerals": []}
+    macros = period_data.get("total_macronutrients") or period_data.get("macronutrients") or {}
+    micros = period_data.get("total_micronutrients") or period_data.get("micronutrients") or {"vitamins": [], "minerals": []}
 
-    # Header badges
+    period_mult = 1.0 if active_tracker_period == "daily" else (7.0 if active_tracker_period == "weekly" else 30.0)
+
+    # Header badges & context bar
     period_badge = window.document.getElementById("tracker-period-badge")
     if period_badge:
-        lbl = period_data.get("label") or active_tracker_period.upper()
         if active_tracker_period == "daily":
-            lbl = f"Daily Tracker (Today - {datetime.now().strftime('%b %d, %Y')})"
-        period_badge.textContent = lbl
+            period_badge.textContent = "Today's Intake (Daily View)"
+        elif active_tracker_period == "weekly":
+            period_badge.textContent = "Weekly Intake (Last 7 Days)"
+        else:
+            period_badge.textContent = "Monthly Intake (Last 30 Days)"
 
-    count_badge = window.document.getElementById("tracker-meals-count-badge")
-    if count_badge:
-        m_count = len(meals)
-        count_badge.textContent = f"{m_count} {'meal' if m_count == 1 else 'meals'} logged"
+    sub_text = window.document.getElementById("tracker-period-subtext")
+    if sub_text:
+        if active_tracker_period == "daily":
+            sub_text.textContent = "Showing meals & cumulative targets for today"
+        elif active_tracker_period == "weekly":
+            sub_text.textContent = "Showing meals & cumulative targets across the last 7 days"
+        else:
+            sub_text.textContent = "Showing meals & cumulative targets across the last 30 days"
 
-    avg_badge = window.document.getElementById("tracker-daily-avg-badge")
-    if avg_badge:
-        avg_cals = round(period_data.get("daily_average_calories_kcal") or 0.0)
-        avg_badge.innerHTML = f'Avg: <strong class="text-[#173c2c]">{avg_cals} kcal / day</strong>'
+    meals_count_el = window.document.getElementById("tracker-meals-count")
+    if meals_count_el:
+        meals_count_el.textContent = str(len(meals))
 
-    # Hero Cards
-    hero_cals = window.document.getElementById("tracker-hero-calories")
-    if hero_cals:
-        cals_val = round(macros.get("calories_kcal") or 0.0)
-        hero_cals.innerHTML = f"{cals_val} <small>kcal</small>"
+    # Hero Cards & Progress Bars
+    # 1. Calories
+    cal_val = float(macros.get("calories_kcal") or 0.0)
+    cal_goal = 2000.0 * period_mult
+    cal_pct = min(100, max(0, int(round((cal_val / cal_goal) * 100)))) if cal_goal > 0 else 0
+    stat_c = window.document.getElementById("tracker-stat-calories")
+    if stat_c:
+        stat_c.textContent = f"{cal_val:.0f}"
+    pct_c = window.document.getElementById("tracker-pct-calories")
+    if pct_c:
+        pct_c.textContent = f"{cal_pct}%"
+    bar_c = window.document.getElementById("tracker-bar-calories")
+    if bar_c:
+        bar_c.style.width = f"{cal_pct}%"
+    tgt_c = window.document.getElementById("tracker-target-calories")
+    if tgt_c:
+        tgt_c.textContent = f"Goal: {cal_goal:,.0f} kcal"
 
-    hero_cals_sub = window.document.getElementById("tracker-hero-calories-sub")
-    if hero_cals_sub:
-        hero_cals_sub.textContent = f"Across {len(meals)} logged meals"
+    # 2. Protein
+    prot_val = float(macros.get("protein_g") or 0.0)
+    prot_goal = 60.0 * period_mult
+    prot_pct = min(100, max(0, int(round((prot_val / prot_goal) * 100)))) if prot_goal > 0 else 0
+    stat_p = window.document.getElementById("tracker-stat-protein")
+    if stat_p:
+        stat_p.textContent = f"{prot_val:.1f}"
+    pct_p = window.document.getElementById("tracker-pct-protein")
+    if pct_p:
+        pct_p.textContent = f"{prot_pct}%"
+    bar_p = window.document.getElementById("tracker-bar-protein")
+    if bar_p:
+        bar_p.style.width = f"{prot_pct}%"
+    tgt_p = window.document.getElementById("tracker-target-protein")
+    if tgt_p:
+        tgt_p.textContent = f"Goal: {prot_goal:.0f}g"
 
-    hero_prot = window.document.getElementById("tracker-hero-protein")
-    if hero_prot:
-        prot_val = round(macros.get("protein_g") or 0.0, 1)
-        hero_prot.innerHTML = f"{prot_val} <small>g</small>"
+    # 3. Carbs
+    carb_val = float(macros.get("carbohydrates_g") or 0.0)
+    carb_goal = 250.0 * period_mult
+    carb_pct = min(100, max(0, int(round((carb_val / carb_goal) * 100)))) if carb_goal > 0 else 0
+    stat_carb = window.document.getElementById("tracker-stat-carbs")
+    if stat_carb:
+        stat_carb.textContent = f"{carb_val:.1f}"
+    pct_carb = window.document.getElementById("tracker-pct-carbs")
+    if pct_carb:
+        pct_carb.textContent = f"{carb_pct}%"
+    bar_carb = window.document.getElementById("tracker-bar-carbs")
+    if bar_carb:
+        bar_carb.style.width = f"{carb_pct}%"
+    tgt_carb = window.document.getElementById("tracker-target-carbs")
+    if tgt_carb:
+        tgt_carb.textContent = f"Goal: {carb_goal:.0f}g"
 
-    hero_carbs = window.document.getElementById("tracker-hero-carbs")
-    if hero_carbs:
-        carb_val = round(macros.get("carbohydrates_g") or 0.0, 1)
-        hero_carbs.innerHTML = f"{carb_val} <small>g</small>"
+    # 4. Fat
+    fat_val = float(macros.get("total_fat_g") or 0.0)
+    fat_goal = 65.0 * period_mult
+    fat_pct = min(100, max(0, int(round((fat_val / fat_goal) * 100)))) if fat_goal > 0 else 0
+    stat_f = window.document.getElementById("tracker-stat-fat")
+    if stat_f:
+        stat_f.textContent = f"{fat_val:.1f}"
+    pct_f = window.document.getElementById("tracker-pct-fat")
+    if pct_f:
+        pct_f.textContent = f"{fat_pct}%"
+    bar_f = window.document.getElementById("tracker-bar-fat")
+    if bar_f:
+        bar_f.style.width = f"{fat_pct}%"
+    tgt_f = window.document.getElementById("tracker-target-fat")
+    if tgt_f:
+        tgt_f.textContent = f"Goal: {fat_goal:.0f}g"
 
-    hero_carbs_sub = window.document.getElementById("tracker-hero-carbs-sub")
-    if hero_carbs_sub:
-        sugar_val = round(macros.get("total_sugars_g") or 0.0, 1)
-        hero_carbs_sub.textContent = f"Sugars: {sugar_val}g"
+    # 5. Fiber
+    fib_val = float(macros.get("dietary_fiber_g") or 0.0)
+    fib_goal = 30.0 * period_mult
+    fib_pct = min(100, max(0, int(round((fib_val / fib_goal) * 100)))) if fib_goal > 0 else 0
+    stat_fib = window.document.getElementById("tracker-stat-fiber")
+    if stat_fib:
+        stat_fib.textContent = f"{fib_val:.1f}"
+    pct_fib = window.document.getElementById("tracker-pct-fiber")
+    if pct_fib:
+        pct_fib.textContent = f"{fib_pct}%"
+    bar_fib = window.document.getElementById("tracker-bar-fiber")
+    if bar_fib:
+        bar_fib.style.width = f"{fib_pct}%"
+    tgt_fib = window.document.getElementById("tracker-target-fiber")
+    if tgt_fib:
+        tgt_fib.textContent = f"Goal: {fib_goal:.0f}g"
 
-    hero_fat = window.document.getElementById("tracker-hero-fat")
-    if hero_fat:
-        fat_val = round(macros.get("total_fat_g") or 0.0, 1)
-        hero_fat.innerHTML = f"{fat_val} <small>g</small>"
-
-    hero_sat_chol = window.document.getElementById("tracker-hero-sat-chol")
-    if hero_sat_chol:
-        sat_val = round(macros.get("saturated_fat_g") or 0.0, 1)
-        trans_val = round(macros.get("trans_fat_g") or 0.0, 1)
-        hero_sat_chol.textContent = f"Sat: {sat_val}g · Trans: {trans_val}g"
-
-    hero_fiber = window.document.getElementById("tracker-hero-fiber")
-    if hero_fiber:
-        fiber_val = round(macros.get("dietary_fiber_g") or 0.0, 1)
-        hero_fiber.innerHTML = f"{fiber_val} <small>g</small>"
-
-    # 13 Macronutrients list
-    macro_items = window.document.querySelectorAll("#tracker-macros-list [data-macro-key]")
+    # 14 Macronutrients in #tracker-macronutrients-grid
+    macro_items = window.document.querySelectorAll("#tracker-macronutrients-grid [data-macro-key]")
     for i in range(macro_items.length):
         dd = macro_items.item(i)
         key = dd.dataset.macroKey
         unit = dd.dataset.macroUnit or "g"
+        try:
+            daily_goal = float(dd.dataset.macroGoal or 60.0)
+        except Exception:
+            daily_goal = 60.0
+        goal = daily_goal * period_mult
         val = float(macros.get(key) or 0.0)
-        formatted = f"{val:.1f}" if unit in ("kcal", "mg") else f"{val:.2f}"
+        pct = min(100, max(0, int(round((val / goal) * 100)))) if goal > 0 else 0
+        formatted = f"{val:.1f}" if unit in ("kcal", "mg") else f"{val:.1f}"
         dd.textContent = f"{formatted} {unit}"
 
-    # Vitamins list
-    vit_count = window.document.getElementById("tracker-vitamins-count")
-    vit_list = window.document.getElementById("tracker-vitamins-list")
-    vitamins = micros.get("vitamins") or []
-    if vit_count:
-        vit_count.textContent = f"{len(vitamins)} tracked"
-    if vit_list:
-        vit_list.replaceChildren()
-        if not vitamins:
-            vit_list.innerHTML = (
-                '<p class="m-0 rounded-xl border border-dashed border-[#d5ded4] p-5 text-center text-xs text-[#748078]">'
-                'No vitamin data recorded for this period yet. Log an analyzed dish from Chat using '
-                '<strong>“Log to Tracker”</strong> to populate full USDA vitamin profiles.</p>'
+        parent = dd.closest(".rounded-xl")
+        if parent:
+            pct_el = parent.querySelector(f'[data-macro-pct="{key}"]')
+            if pct_el:
+                pct_el.textContent = f"({pct}%)"
+            bar_el = parent.querySelector(f'[data-macro-bar="{key}"]')
+            if bar_el:
+                bar_el.style.width = f"{pct}%"
+
+    # Total Micronutrients (Vitamins & Minerals)
+    micro_container = window.document.getElementById("tracker-micronutrients-container")
+    if micro_container:
+        vitamins = micros.get("vitamins") or []
+        minerals = micros.get("minerals") or []
+
+        def build_micro_col(items, label):
+            if not items:
+                return f'<p class="text-xs text-stone-400 italic">No {label.lower()} logged for this period yet.</p>'
+            rows_html = "".join(
+                f'<div class="flex justify-between items-center gap-2 border-b border-stone-100 py-1.5 text-xs">'
+                f'<span class="text-stone-600 truncate" title="{it.get("name", "")}">{it.get("name", "")}</span>'
+                f'<strong class="whitespace-nowrap font-semibold text-stone-900">{float(it.get("amount") or 0.0):.2f} {it.get("unit", "")}</strong>'
+                f'</div>'
+                for it in items
             )
-        else:
-            for v in vitamins:
-                row = window.document.createElement("div")
-                row.className = "flex items-center justify-between py-2.5"
-                amt = float(v.get("amount") or 0.0)
-                unit = v.get("unit") or ""
-                name = v.get("name") or "Vitamin"
-                row.innerHTML = f'<span class="font-medium text-[#53645a]">{name}</span><strong class="text-[#173c2c]">{amt:.2f} {unit}</strong>'
-                vit_list.append(row)
+            return f'<div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">{rows_html}</div>'
 
-    # Minerals list
-    min_count = window.document.getElementById("tracker-minerals-count")
-    min_list = window.document.getElementById("tracker-minerals-list")
-    minerals = micros.get("minerals") or []
-    if min_count:
-        min_count.textContent = f"{len(minerals)} tracked"
-    if min_list:
-        min_list.replaceChildren()
-        if not minerals:
-            min_list.innerHTML = (
-                '<p class="m-0 rounded-xl border border-dashed border-[#d5ded4] p-5 text-center text-xs text-[#748078]">'
-                'No mineral data recorded for this period yet. Log an analyzed dish from Chat using '
-                '<strong>“Log to Tracker”</strong> to populate full mineral &amp; electrolyte data.</p>'
-            )
-        else:
-            for m in minerals:
-                row = window.document.createElement("div")
-                row.className = "flex items-center justify-between py-2.5"
-                amt = float(m.get("amount") or 0.0)
-                unit = m.get("unit") or ""
-                name = m.get("name") or "Mineral"
-                row.innerHTML = f'<span class="font-medium text-[#53645a]">{name}</span><strong class="text-[#173c2c]">{amt:.2f} {unit}</strong>'
-                min_list.append(row)
+        micro_container.innerHTML = (
+            '<h4 class="mb-2 mt-3 text-[10px] font-bold uppercase tracking-wider text-stone-500">Vitamins</h4>'
+            + build_micro_col(vitamins, "Vitamins")
+            + '<h4 class="mb-2 mt-4 text-[10px] font-bold uppercase tracking-wider text-stone-500">Minerals</h4>'
+            + build_micro_col(minerals, "Minerals")
+        )
 
-    # Meals list
-    meals_badge = window.document.getElementById("tracker-meals-section-badge")
-    if meals_badge:
-        m_len = len(meals)
-        meals_badge.textContent = f"{m_len} {'entry' if m_len == 1 else 'entries'}"
-
+    # Tracked Meal Logs Section
     meals_container = window.document.getElementById("tracker-meals-list")
     if meals_container:
         meals_container.replaceChildren()
         if not meals:
             meals_container.innerHTML = (
-                '<div class="rounded-xl border border-dashed border-[#d5ded4] p-8 text-center">'
-                '<p class="serif m-0 text-xl text-[#173c2c]">No meals logged in this period yet</p>'
-                '<p class="mx-auto mt-1.5 max-w-[520px] text-xs leading-relaxed text-[#6d7871]">'
-                'General questions in chat are never automatically added to your tracker. To log a meal, either say '
-                '<em>“Log this meal to my tracker”</em> in chat/voice, click the <strong>“Log to Tracker”</strong> button next to any analyzed dish, '
+                '<div class="rounded-xl border border-dashed border-stone-200 p-8 text-center bg-stone-50/50">'
+                '<p class="m-0 text-sm font-bold text-stone-700">No meals logged in this period yet</p>'
+                '<p class="mx-auto mt-1 max-w-[480px] text-xs leading-relaxed text-stone-500">'
+                'Log an analyzed dish from Chat by clicking the <strong>“Log to Tracker”</strong> button on any dish card, '
                 'or click <strong>“+ Log Custom Meal”</strong> above.</p></div>'
             )
         else:
             for item in meals:
                 m_macs = item.get("macronutrients") or {}
-                logged_via = item.get("logged_via") or "manual"
-                if logged_via in ("explicit_chat", "text_intent", "voice_intent"):
-                    via_label = "Logged via Chat/Voice Intent"
-                elif logged_via in ("chat_button", "button"):
-                    via_label = "Logged via Chat Button"
-                else:
-                    via_label = "Manual Entry"
+                c_cal = round((item.get("calories_kcal") or m_macs.get("calories_kcal") or 0))
+                c_prot = round((item.get("protein_g") or m_macs.get("protein_g") or 0), 1)
+                c_carb = round((item.get("carbohydrates_g") or m_macs.get("carbohydrates_g") or 0), 1)
+                c_fat = round((item.get("total_fat_g") or m_macs.get("total_fat_g") or 0), 1)
+                c_fiber = round((item.get("dietary_fiber_g") or m_macs.get("dietary_fiber_g") or 0), 1)
 
+                m_title = item.get("meal_title") or "Logged Meal"
+                m_type = item.get("meal_category") or item.get("meal_type") or "Meal"
+                c_time = item.get("consumed_display") or item.get("consumed_time") or "Today"
+                log_id = str(item.get("id"))
                 conv_id = item.get("conversation_id") or ""
-                msg_id = item.get("source_message_id") or ""
-                chat_turn_url = f"/chats/{conv_id}#turn-{msg_id}" if (conv_id and msg_id) else (f"/chats/{conv_id}" if conv_id else "")
 
-                meal_title = item.get("meal_title") or "Meal"
-                if chat_turn_url:
-                    title_markup = (
-                        f'<a href="{chat_turn_url}" hx-get="/chats/{conv_id}" hx-select="main[data-conversation-id]" '
-                        f'hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="{chat_turn_url}" hx-indicator="#chat-loading" '
-                        f'class="group/title inline-flex items-center gap-1.5 text-sm font-bold text-[#173c2c] hover:text-[#2d6f51] hover:underline transition" title="Go to this meal in Chat">'
-                        f'<span>{meal_title}</span>'
-                        f'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="opacity-60 group-hover/title:opacity-100 transition" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>'
+                chat_link_html = ""
+                if conv_id:
+                    chat_link_html = (
+                        f'<a href="/" data-open-chat-id="{conv_id}" hx-post="/chats/open" '
+                        f'hx-vals=\'{{"conversation_id": "{conv_id}"}}\' hx-target="#chat-view" '
+                        f'hx-select="main" hx-swap="innerHTML" hx-push-url="/" '
+                        f'class="inline-flex items-center gap-1 text-[11px] font-bold text-[#245c43] hover:underline">'
+                        f'<span>View in Chat ↗</span></a>'
                     )
-                    chat_btn_markup = (
-                        f'<a href="{chat_turn_url}" hx-get="/chats/{conv_id}" hx-select="main[data-conversation-id]" '
-                        f'hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="{chat_turn_url}" hx-indicator="#chat-loading" '
-                        f'class="tracker-chat-link h-8 px-2.5 rounded-lg inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 border border-stone-200 transition cursor-pointer" title="Jump to the original chat turn where this dish was analyzed">'
-                        f'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
-                        f'<span>View in Chat</span></a>'
-                    )
-                else:
-                    title_markup = f'<strong class="text-sm font-bold text-[#173c2c]">{meal_title}</strong>'
-                    chat_btn_markup = ""
+
+                notes_html = f'<p class="text-xs text-stone-500 mt-0.5 line-clamp-1 m-0">{item.get("serving_notes")}</p>' if item.get("serving_notes") else ""
 
                 article = window.document.createElement("article")
-                article.className = "tracker-meal-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs hover:border-[#245c43]/40 transition"
-                article.dataset.trackedMealRow = str(item.get("id"))
-
-                c_cal = round(m_macs.get("calories_kcal") or 0.0)
-                c_prot = round(m_macs.get("protein_g") or 0.0, 1)
-                c_carb = round(m_macs.get("carbohydrates_g") or 0.0, 1)
-                c_fat = round(m_macs.get("total_fat_g") or 0.0, 1)
-                c_fiber = round(m_macs.get("dietary_fiber_g") or 0.0, 1)
-                c_time = item.get("consumed_display") or item.get("consumed_time") or "Recorded"
-                m_type = item.get("meal_type") or "Meal"
-                log_id = str(item.get("id"))
+                article.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-stone-200/90 bg-white p-4 hover:border-emerald-300 transition shadow-2xs"
+                article.dataset.trackedMealId = log_id
+                article.setAttribute("data-tracked-meal-row", log_id)
 
                 article.innerHTML = f"""
                   <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      {title_markup}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">{m_type}</span>
-                      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-200" title="Consumption time">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>{c_time}</span>
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#245c43] border border-emerald-200">
+                        {m_type}
                       </span>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800">{via_label}</span>
+                      <span class="text-[11px] font-medium text-stone-400">
+                        {c_time}
+                      </span>
+                      {chat_link_html}
                     </div>
-                    <p class="m-0 mt-2 text-xs text-stone-600">
-                      <strong class="text-stone-900">{c_cal} kcal</strong> ·
-                      Protein: <strong class="text-stone-800">{c_prot}g</strong> ·
-                      Carbs: <strong class="text-stone-800">{c_carb}g</strong> ·
-                      Fat: <strong class="text-stone-800">{c_fat}g</strong> ·
-                      Fiber: <strong class="text-stone-800">{c_fiber}g</strong>
-                    </p>
+                    <h4 class="font-bold text-stone-900 text-sm truncate m-0">{m_title}</h4>
+                    {notes_html}
                   </div>
-                  <div class="flex items-center gap-2">
-                    {chat_btn_markup}
+
+                  <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-[#173c2c] font-bold border border-emerald-200">{c_cal} kcal</span>
+                      <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">P: {c_prot}g</span>
+                      <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">C: {c_carb}g</span>
+                      <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">F: {c_fat}g</span>
+                    </div>
+                    <button
+                      type="button"
+                      data-share-meal-to-group
+                      data-meal-title="{m_title}"
+                      data-meal-category="{m_type}"
+                      data-calories="{c_cal}"
+                      data-protein="{c_prot}"
+                      data-carbs="{c_carb}"
+                      data-fat="{c_fat}"
+                      data-fiber="{c_fiber}"
+                      class="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-[#173c2c] text-[11px] font-bold transition cursor-pointer inline-flex items-center gap-1"
+                      title="Share this meal to a Nutrition Group"
+                    >
+                      <span>⇄ Share to Group</span>
+                    </button>
                     <button
                       type="button"
                       data-delete-tracked-meal-id="{log_id}"
-                      class="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-red-700 hover:bg-red-50 border border-stone-200 hover:border-red-200 transition cursor-pointer"
-                      title="Remove this meal from your tracker"
+                      class="h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                      title="Remove meal from tracker"
+                      aria-label="Remove meal from tracker"
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                      <span>Delete</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                   </div>
                 """
@@ -311,17 +352,14 @@ async def load_tracker_data(period: str = None) -> None:
     if period:
         active_tracker_period = period
 
-    tracker_page = window.document.querySelector('[data-page="tracker"]')
-    if not tracker_page:
-        return
-
     today_str = get_today_iso()
     url = f"/tracker/data?period={active_tracker_period}&date={today_str}"
     try:
         resp = await window.fetch(url, to_js({"headers": {"Accept": "application/json"}}))
-        payload = await resp.json()
-        if not resp.ok:
-            detail = getattr(payload, "detail", "Could not load tracker data.")
+        text = await resp.text()
+        payload = json.loads(text) if text else {}
+        if not resp.ok or not isinstance(payload, dict):
+            detail = payload.get("detail", "Could not load tracker data.") if isinstance(payload, dict) else "Could not load tracker data."
             show_feedback("tracker-feedback", str(detail), True)
             return
         tracker_cache = payload

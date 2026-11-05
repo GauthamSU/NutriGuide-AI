@@ -110,6 +110,52 @@ def identify_dish_node(state: NutriGuideState) -> Dict[str, Any]:
 
         dietary_tags = _normalize_string_list(raw_result.get("dietary_tags"))
         health_insights = _normalize_string_list(raw_result.get("health_insights"))
+
+        # Check for user's previously saved household recipe preferences for this dish
+        user_identifier = state.get("user_id") or state.get("owner_id")
+        if user_identifier and dish_name:
+            try:
+                from backend.assistant.models import UserCustomRecipe
+                from django.db.models import Q
+                saved_pref = (
+                    UserCustomRecipe.objects.filter(
+                        Q(owner_id=str(user_identifier)),
+                        Q(dish_name__iexact=dish_name.strip()) | Q(ai_dish_name__iexact=dish_name.strip()),
+                    )
+                    .order_by("-updated_at")
+                    .first()
+                )
+                if saved_pref:
+                    if saved_pref.dish_name:
+                        dish_name = saved_pref.dish_name
+                    if saved_pref.description:
+                        recognized_summary = saved_pref.description
+                if saved_pref and saved_pref.customized_ingredients:
+                    pref_items = []
+                    for ci in saved_pref.customized_ingredients:
+                        c_name = str(ci.get("ingredient_name") or ci.get("food_name") or "").strip()
+                        if not c_name:
+                            continue
+                        pref_items.append({
+                            "ingredient_name": c_name,
+                            "serving_size_description": str(ci.get("serving_size_description") or "1 serving"),
+                            "estimated_weight_grams": float(ci.get("estimated_weight_grams") or 50.0),
+                            "confidence": 1.0,
+                            "glycemic_index_category": ci.get("glycemic_index_category"),
+                            "macronutrients": None,
+                            "micronutrients": None,
+                            "found_in_database": None,
+                            "database_food_code": None,
+                            "database_food_name": None,
+                        })
+                    if pref_items:
+                        normalized_ingredients = pref_items
+                        health_insights.append(
+                            f"Applied your saved household recipe for {dish_name}."
+                        )
+            except Exception as exc:
+                logger.debug("Could not lookup custom recipe preference: %s", exc)
+
         ai_generated_response = {
             "dish_name": dish_name,
             "recognized_input_summary": summary,

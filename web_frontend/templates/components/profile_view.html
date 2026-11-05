@@ -53,8 +53,8 @@
 
         <p id="profile-feedback" class="hidden mb-5 rounded-xl border p-3.5 text-xs font-medium" role="alert"></p>
 
-        <form id="profile-form" novalidate data-authenticated="{{ 'true' if current_user else 'false' }}">
-          <input type="hidden" name="owner_id" value="{{ owner_id }}">
+        <form id="profile-form" method="post" action="/profile/update" novalidate data-authenticated="{{ 'true' if current_user else 'false' }}">
+
           <input type="hidden" name="profile_picture" id="profile-picture-data" value="{{ p.profile_picture or '' }}">
           <input type="hidden" name="remove_avatar" id="remove-profile-picture-flag" value="0">
 

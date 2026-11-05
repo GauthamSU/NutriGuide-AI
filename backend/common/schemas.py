@@ -248,10 +248,12 @@ class SignupRequestSchema(Schema):
     email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=1, max_length=256)
     name: Optional[str] = Field(default="", max_length=150)
+    full_name: Optional[str] = Field(default="", max_length=150)
     owner_id: Optional[str] = None
 
 
 class LoginRequestSchema(Schema):
+    identifier: Optional[str] = None
     username: Optional[str] = None
     email: Optional[str] = None
     username_or_email: Optional[str] = None
@@ -402,3 +404,19 @@ class HealthCheckResponseSchema(Schema):
     database_food_count: Optional[int] = Field(
         None, description="Number of reference food items currently loaded in the database"
     )
+
+
+class IngredientCustomizationItemSchema(Schema):
+    food_name: str = Field(..., description="Name of ingredient/food item")
+    estimated_weight_grams: float = Field(..., description="Weight in grams")
+    serving_size_description: Optional[str] = Field("1 serving", description="Portion description")
+    confidence: Optional[float] = Field(1.0, description="Confidence")
+
+
+class CustomizeRecipeRequestSchema(Schema):
+    owner_id: str = Field(..., description="User owner identifier")
+    ingredients: List[IngredientCustomizationItemSchema] = Field(..., description="Customized ingredients list")
+    dish_name: Optional[str] = Field(None, description="Standardized or customized dish title")
+    description: Optional[str] = Field(None, description="User customized dish description / summary")
+    notes: Optional[str] = Field("", description="Household culinary notes")
+

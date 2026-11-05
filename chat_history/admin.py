@@ -9,6 +9,7 @@ from chat_history.models import (
     MealPlanHistory,
     NutritionGroup,
     TrackedMeal,
+    UserCustomRecipe,
     UserProfile,
 )
 
@@ -128,3 +129,12 @@ class GroupMembershipRequestAdmin(admin.ModelAdmin):
     list_display = ("group", "user", "created_by", "request_type", "status", "created_at")
     list_filter = ("request_type", "status", "created_at")
     search_fields = ("group__name", "user__username", "created_by__username")
+
+
+@admin.register(UserCustomRecipe)
+class UserCustomRecipeAdmin(admin.ModelAdmin):
+    list_display = ("dish_name", "ai_dish_name", "owner_id", "user", "created_at", "updated_at")
+    list_filter = ("created_at", "updated_at")
+    search_fields = ("dish_name", "ai_dish_name", "description", "ai_description", "owner_id", "user__username", "notes")
+    readonly_fields = ("id", "created_at", "updated_at")
+

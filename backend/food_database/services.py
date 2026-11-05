@@ -302,6 +302,25 @@ COMMON_CULINARY_ALIASES: Dict[str, str] = {
     "rice bran oil": "T008",
     "vanaspati": "T014",
 
+    # Nuts & Oilseeds
+    "peanut": "H012",
+    "peanuts": "H012",
+    "groundnut": "H012",
+    "groundnuts": "H012",
+    "ground nut": "H012",
+    "moongphali": "H012",
+    "cashew": "H005",
+    "cashews": "H005",
+    "cashew nut": "H005",
+    "kaju": "H005",
+    "almond": "H001",
+    "almonds": "H001",
+    "badam": "H001",
+    "mustard seeds": "H013",
+    "mustard seed": "H013",
+    "rai": "H013",
+    "sarson": "H013",
+
     # Sweeteners & Coconut
     "coconut": "H007",
     "fresh coconut": "H007",
@@ -733,6 +752,38 @@ def resolve_dish_nutrition_from_db(
     dietary_tags = list(dish_data.get("dietary_tags") or [])
     health_insights = list(dish_data.get("health_insights") or [])
 
+    # Aggregate total micronutrients (vitamins & minerals) across resolved items
+    micro_totals: Dict[str, Dict[Tuple[str, str], Dict[str, Any]]] = {
+        "vitamins": {},
+        "minerals": {},
+    }
+    for resolved_item in resolved_items:
+        item_micros = resolved_item.get("micronutrients") or {}
+        for category in ("vitamins", "minerals"):
+            for micro in item_micros.get(category) or []:
+                m_name = str(micro.get("name") or "Unknown")
+                m_unit = str(micro.get("unit") or "")
+                m_key = (m_name, m_unit)
+                entry = micro_totals[category].setdefault(
+                    m_key,
+                    {"name": m_name, "unit": m_unit, "amount": 0.0, "daily_value_percent": 0.0},
+                )
+                entry["amount"] += float(micro.get("amount") or 0.0)
+                entry["daily_value_percent"] += float(micro.get("daily_value_percent") or 0.0)
+
+    total_micros = {
+        category: [
+            {
+                "name": item["name"],
+                "unit": item["unit"],
+                "amount": round(item["amount"], 2),
+                "daily_value_percent": round(item["daily_value_percent"], 1),
+            }
+            for item in sorted(cat_map.values(), key=lambda x: (-x["daily_value_percent"], x["name"]))
+        ]
+        for category, cat_map in micro_totals.items()
+    }
+
     # Explicitly highlight missing ingredients if any
     if missing_ingredients:
         unique_missing = sorted(list(set(missing_ingredients)))
@@ -749,6 +800,7 @@ def resolve_dish_nutrition_from_db(
         "recognized_input_summary": summary,
         "items": resolved_items,
         "total_macronutrients": total_macros,
+        "total_micronutrients": total_micros,
         "dietary_tags": dietary_tags,
         "health_insights": health_insights,
         "missing_ingredients": missing_ingredients,

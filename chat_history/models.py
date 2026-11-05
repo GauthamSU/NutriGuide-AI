@@ -8,7 +8,7 @@ All models are modularly defined and documented in backend/:
 - backend.profile.models (UserProfile)
 """
 
-from backend.assistant.models import ChatConversation, ChatMessage
+from backend.assistant.models import ChatConversation, ChatMessage, UserCustomRecipe
 from backend.groups.models import (
     GroupMealLog,
     GroupMembership,
@@ -22,6 +22,7 @@ from backend.tracker.models import TrackedMeal
 __all__ = [
     "ChatConversation",
     "ChatMessage",
+    "UserCustomRecipe",
     "MealPlanHistory",
     "UserProfile",
     "NutritionGroup",

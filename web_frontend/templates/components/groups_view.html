@@ -181,7 +181,7 @@
                   </p>
                 </div>
                 <div class="flex items-center gap-2">
-                  <a href="/groups/{{ grp.id }}" class="btn-primary !py-1.5 !px-3.5 !text-xs text-center inline-flex items-center gap-1" hx-get="/groups/{{ grp.id }}" hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups/{{ grp.id }}" hx-indicator="#chat-loading">
+                  <a href="/groups" data-open-group-id="{{ grp.id }}" class="btn-primary !py-1.5 !px-3.5 !text-xs text-center inline-flex items-center gap-1" hx-post="/groups/open" hx-vals='{"group_id": "{{ grp.id }}"}' hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups" hx-indicator="#chat-loading">
                     <span>View Group</span>
                     <span>→</span>
                   </a>
@@ -270,7 +270,7 @@
                       <button type="button" class="btn-secondary !py-1.5 !px-3 !text-xs" data-join-group-id="{{ grp.id }}">Request to Join</button>
                     {% endif %}
                   {% endif %}
-                  <a href="/groups/{{ grp.id }}" class="btn-primary !py-1.5 !px-3 !text-xs text-center inline-flex items-center gap-1" hx-get="/groups/{{ grp.id }}" hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups/{{ grp.id }}" hx-indicator="#chat-loading">
+                  <a href="/groups" data-open-group-id="{{ grp.id }}" class="btn-primary !py-1.5 !px-3 !text-xs text-center inline-flex items-center gap-1" hx-post="/groups/open" hx-vals='{"group_id": "{{ grp.id }}"}' hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups" hx-indicator="#chat-loading">
                     <span>Open</span>
                     <span>→</span>
                   </a>
@@ -298,8 +298,8 @@
         <button type="button" data-close-modal="create-group-modal" class="icon-button !h-8 !w-8" aria-label="Close modal">✕</button>
       </div>
 
-      <form id="create-group-form" novalidate>
-        <input type="hidden" name="owner_id" value="{{ owner_id }}">
+      <form id="create-group-form" method="post" action="/groups/create" novalidate>
+
         <div id="create-group-feedback" class="hidden mb-4 rounded-lg p-3 text-xs font-medium" role="alert"></div>
         <fieldset {% if not current_user %}disabled class="m-0 border-0 p-0 opacity-50 pointer-events-none"{% else %}class="m-0 border-0 p-0"{% endif %}>
           <div class="mb-4">

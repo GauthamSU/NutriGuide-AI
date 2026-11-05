@@ -1,13 +1,15 @@
 <div id="chat-history-list" class="flex-1 min-h-0 overflow-y-auto px-2 pb-4 space-y-0.5" {% if history_oob %}hx-swap-oob="innerHTML"{% endif %}>
   {% for chat in chat_conversations or [] %}
     <div class="chat-history-row group flex items-center justify-between gap-1 rounded-lg px-2 py-1 transition hover:bg-stone-100/80 {% if selected_chat_id == chat.id %}bg-emerald-50/90 text-[#173c2c]{% endif %}" data-chat-history-row="{{ chat.id }}" data-conversation-item-id="{{ chat.id }}">
-      <a class="chat-history-link min-w-0 flex-1 truncate text-xs font-medium text-stone-600 hover:text-stone-900 transition py-1 {% if selected_chat_id == chat.id %}!text-[#173c2c] !font-bold{% endif %}" href="/chats/{{ chat.id }}" hx-get="/chats/{{ chat.id }}" hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/chats/{{ chat.id }}" hx-indicator="#chat-loading" title="{{ chat.title }}" {% if selected_chat_id == chat.id %}aria-current="page"{% endif %}>
+      <a class="chat-history-link min-w-0 flex-1 truncate text-xs font-medium text-stone-600 hover:text-stone-900 transition py-1 {% if selected_chat_id == chat.id %}!text-[#173c2c] !font-bold{% endif %}" href="/" data-open-chat-id="{{ chat.id }}" hx-post="/chats/open" hx-vals='{"conversation_id": "{{ chat.id }}"}' hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/" hx-indicator="#chat-loading" title="{{ chat.title }}" {% if selected_chat_id == chat.id %}aria-current="page"{% endif %}>
         {{ chat.title }}
       </a>
       <button type="button" class="chat-delete-btn h-6 w-6 flex-none rounded-md flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer opacity-70 group-hover:opacity-100" data-delete-chat-id="{{ chat.id }}" data-delete-conversation-id="{{ chat.id }}" title="Delete conversation" aria-label="Delete conversation {{ chat.title }}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
     </div>
+  {% else %}
+    <p class="px-3 py-2 text-xs text-stone-400 font-normal">No chat history yet</p>
   {% endfor %}
   {% if history_error %}
     <p class="px-3 py-2 text-xs text-red-600 font-medium leading-relaxed" role="status">{{ history_error }}</p>

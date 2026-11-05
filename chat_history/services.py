@@ -7,11 +7,13 @@ Implementations are modularly organized in:
 
 from backend.assistant.services import (
     DATABASE_ALIAS,
+    customize_dish_recipe,
     delete_chat_message,
     delete_conversation,
     get_chat_attachment,
     get_conversation,
     list_conversations,
+    reset_dish_recipe,
     save_chat_message,
 )
 from backend.food_database.services import resolve_dish_nutrition_from_db
@@ -28,6 +30,8 @@ __all__ = [
     "get_conversation",
     "delete_conversation",
     "delete_chat_message",
+    "customize_dish_recipe",
+    "reset_dish_recipe",
     "get_chat_attachment",
     "save_meal_plan",
     "list_meal_plans",

@@ -28,18 +28,25 @@ profile_router = Router(tags=["User Profile"])
 
 @auth_router.post("/signup", summary="Create a new user account with username, email, and password")
 def api_signup(request, payload: SignupRequestSchema):
+    resolved_name = (payload.name or payload.full_name or "").strip()
     return signup_user(
         username=payload.username,
         email=payload.email,
         password=payload.password,
-        name=payload.name or "",
+        name=resolved_name,
         owner_id=payload.owner_id,
     )
 
 
 @auth_router.post("/login", summary="Authenticate user with username/email and password")
 def api_login(request, payload: LoginRequestSchema):
-    identifier = (payload.username_or_email or payload.username or payload.email or "").strip()
+    identifier = (
+        payload.username_or_email
+        or payload.identifier
+        or payload.username
+        or payload.email
+        or ""
+    ).strip()
     return login_user(username_or_email=identifier, password=payload.password)
 
 

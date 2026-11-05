@@ -100,8 +100,22 @@ from groups import (
     trigger_group_meal_image_picker,
 )
 from chat import (
+    add_ingredient_row_to_dom,
+    after_request,
+    before_request,
     handle_delete_chat_message,
     handle_delete_conversation,
+    handle_enter,
+    handle_image_change,
+    handle_recipe_customize_submit,
+    handle_reset_recipe,
+    recalculate_recipe_macros_realtime,
+    recording,
+    resize_textarea,
+    start_recording,
+    stop_microphone_tracks,
+    stop_recording,
+    toggle_recipe_mode,
 )
 
 
@@ -250,6 +264,83 @@ async def handle_global_clicks(event):
                 "Delete Chat Conversation",
                 f"Are you sure you want to delete {c_label}? All messages in this chat will be permanently deleted.",
                 lambda: handle_delete_conversation(conv_id),
+            )
+        return
+
+    # 10b. Recipe Customization: Toggle In-Place Form
+    toggle_recipe_btn = target.closest("[data-toggle-recipe-mode], .customize-recipe-btn")
+    if toggle_recipe_btn:
+        msg_id = getattr(toggle_recipe_btn.dataset, "toggleRecipeMode", "") or getattr(toggle_recipe_btn.dataset, "msgId", "")
+        if msg_id:
+            toggle_recipe_mode(msg_id, enable_edit=True)
+        return
+
+    # 10c. Recipe Customization: Cancel Mode
+    cancel_recipe_btn = target.closest("[data-cancel-recipe-mode], .cancel-recipe-mode-btn")
+    if cancel_recipe_btn:
+        msg_id = getattr(cancel_recipe_btn.dataset, "cancelRecipeMode", "") or getattr(cancel_recipe_btn.dataset, "msgId", "")
+        if msg_id:
+            toggle_recipe_mode(msg_id, enable_edit=False)
+        return
+
+    # 10d. Recipe Customization: Add New Ingredient Row
+    add_ing_btn = target.closest("[data-add-ingredient-btn]")
+    if add_ing_btn:
+        msg_id = getattr(add_ing_btn.dataset, "addIngredientBtn", "")
+        if msg_id:
+            add_ingredient_row_to_dom(msg_id, name="", weight=50.0, desc="1 serving")
+        return
+
+    # 10e. Recipe Customization: Quick Add Ingredient Button
+    quick_add_btn = target.closest(".quick-add-ingredient-btn")
+    if quick_add_btn:
+        msg_id = getattr(quick_add_btn.dataset, "targetMsg", "")
+        name = getattr(quick_add_btn.dataset, "ingName", "")
+        try:
+            weight = float(getattr(quick_add_btn.dataset, "ingWeight", 15.0) or 15.0)
+        except Exception:
+            weight = 15.0
+        desc = getattr(quick_add_btn.dataset, "ingDesc", "1 tbsp")
+        if msg_id and name:
+            add_ingredient_row_to_dom(msg_id, name=name, weight=weight, desc=desc)
+        return
+
+    # 10f. Recipe Customization: Delete Single Ingredient Row (with confirmation popup)
+    del_ing_btn = target.closest(".delete-ingredient-row-btn")
+    if del_ing_btn:
+        ing_row = del_ing_btn.closest(".ingredient-row, [data-ingredient-row]")
+        ing_name = getattr(del_ing_btn.dataset, "ingredientName", "")
+        if not ing_name and ing_row:
+            name_inp = ing_row.querySelector(".ing-name-input")
+            if name_inp:
+                ing_name = name_inp.value.strip()
+        label = f'"{ing_name}"' if ing_name else "this ingredient"
+
+        def do_remove_ing():
+            if ing_row:
+                form = ing_row.closest(".recipe-customize-form")
+                msg_id = getattr(form.dataset, "recipeFormMsg", "") if form else ""
+                ing_row.remove()
+                if msg_id:
+                    recalculate_recipe_macros_realtime(msg_id)
+
+        request_delete_confirmation(
+            "Delete Ingredient",
+            f"Are you sure you want to remove {label} from this recipe? Real-time macros will update immediately.",
+            do_remove_ing,
+        )
+        return
+
+    # 10g. Recipe Customization: Reset Recipe to Original AI Estimate (with confirmation popup)
+    reset_rec_btn = target.closest("[data-reset-recipe-btn], .reset-recipe-btn")
+    if reset_rec_btn:
+        msg_id = getattr(reset_rec_btn.dataset, "resetRecipeMsg", "") or getattr(reset_rec_btn.dataset, "msgId", "")
+        conv_id = getattr(reset_rec_btn.dataset, "conversationId", "") or ""
+        if msg_id:
+            request_delete_confirmation(
+                "Reset Recipe",
+                "Are you sure you want to reset this recipe back to the original AI detected ingredients and portions?",
+                lambda: handle_reset_recipe(msg_id, conv_id),
             )
         return
 
@@ -448,6 +539,29 @@ async def handle_global_clicks(event):
         remove_group_meal_voice()
         return
 
+    # 33. Chat Composer Microphone
+    mic_btn = target.closest("#mic-button")
+    if mic_btn:
+        if recording["recorder"]:
+            await stop_recording()
+        else:
+            await start_recording()
+        return
+
+    # 34. Chat Composer Image Picker Trigger
+    attach_btn = target.closest("#attach-button")
+    if attach_btn:
+        meal_img = window.document.getElementById("meal-image")
+        if meal_img:
+            meal_img.click()
+        return
+
+    # 35. Stop microphone on sidebar navigation
+    nav_el = target.closest("[data-sidebar-link]") or target.closest(".chat-history-link")
+    if nav_el and getattr(nav_el, "href", None):
+        if recording["stream"]:
+            stop_microphone_tracks()
+
 
 # ─── Global Input Delegation ───────────────────────────────────────────────────
 
@@ -465,6 +579,25 @@ def handle_global_inputs(event):
     # 2. Live Public Groups Search
     elif getattr(target, "id", "") in ("public-groups-search", "groups-search-input"):
         asyncio.create_task(load_groups_data(target.value.strip(), public_only=True))
+
+    # 3. Real-time client-side macro & title recalculation when editing recipe inputs
+    cls_list = getattr(target, "classList", None)
+    if cls_list and (
+        cls_list.contains("ing-weight-input")
+        or cls_list.contains("ing-name-input")
+        or cls_list.contains("ing-desc-input")
+        or cls_list.contains("dish-name-input")
+        or cls_list.contains("dish-desc-input")
+    ):
+        form = target.closest(".recipe-customize-form") if hasattr(target, "closest") else None
+        if form:
+            msg_id = getattr(form.dataset, "recipeFormMsg", "") or getattr(form, "id", "").replace("recipe-form-", "")
+            if msg_id:
+                recalculate_recipe_macros_realtime(msg_id)
+
+    # 4. Chat Composer Textarea Resizing
+    elif getattr(target, "id", "") == "meal-description":
+        resize_textarea(event)
 
 
 # ─── Global Change Delegation ──────────────────────────────────────────────────
@@ -513,6 +646,10 @@ def handle_global_changes(event):
         m_box = window.document.getElementById("manual-custom-time-container")
         if m_box:
             m_box.classList.toggle("hidden", not is_custom)
+
+    # 6. Chat Composer Image Selected
+    elif getattr(target, "id", "") == "meal-image":
+        handle_image_change(event)
 
 
 # ─── Global Form Submit Delegation ─────────────────────────────────────────────
@@ -571,8 +708,33 @@ async def handle_global_submits(event):
         event.preventDefault()
         await handle_group_page_invite_member(form)
 
+    # 10. Household Recipe Customization Form
+    elif "recipe-customize-form" in getattr(form, "className", "") or form_id.startswith("recipe-form-"):
+        event.preventDefault()
+        await handle_recipe_customize_submit(form)
+
+
+# ─── Global Keydown Delegation ─────────────────────────────────────────────────
+
+
+@when("keydown", "body")
+def handle_global_keydown(event):
+    target = getattr(event, "target", None)
+    if target and getattr(target, "id", "") == "meal-description":
+        handle_enter(event)
+
 
 # ─── HTMX Lifecycle Coordination & Page Anchors ────────────────────────────────
+
+
+@when("htmx:beforeRequest", "body")
+def handle_global_before_request(event):
+    before_request(event)
+
+
+@when("htmx:afterRequest", "body")
+def handle_global_after_request(event):
+    after_request(event)
 
 
 def highlight_hash_anchor() -> None:

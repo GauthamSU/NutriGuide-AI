@@ -222,6 +222,11 @@ def serialize_tracked_meal(meal: TrackedMeal) -> Dict[str, Any]:
         "consumed_display": time_display,
         "is_today": is_today,
         "created_at": meal.created_at.isoformat(),
+        "calories_kcal": round(float(macros.get("calories_kcal") or 0.0), 1),
+        "protein_g": round(float(macros.get("protein_g") or 0.0), 1),
+        "carbohydrates_g": round(float(macros.get("carbohydrates_g") or 0.0), 1),
+        "total_fat_g": round(float(macros.get("total_fat_g") or 0.0), 1),
+        "dietary_fiber_g": round(float(macros.get("dietary_fiber_g") or 0.0), 1),
     }
 
 

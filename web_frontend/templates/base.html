@@ -97,8 +97,8 @@
           <div id="sidebar-my-groups-list" class="sidebar-subnav-list flex-col space-y-1 pl-4 pr-2 pb-2 pt-1 border-l-2 border-stone-200 ml-6 my-1">
             {% if my_groups %}
               {% for grp in my_groups %}
-                <a href="/groups/{{ grp.id }}" class="sidebar-group-item flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-600 hover:text-stone-900 hover:bg-white transition-colors {% if current_group_id == grp.id|string %}bg-white font-bold text-[#173c2c] shadow-2xs{% endif %}"
-                  data-sidebar-group-id="{{ grp.id }}" hx-get="/groups/{{ grp.id }}" hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups/{{ grp.id }}" hx-indicator="#chat-loading">
+                <a href="/groups" class="sidebar-group-item flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-600 hover:text-stone-900 hover:bg-white transition-colors {% if current_group_id == grp.id|string %}bg-white font-bold text-[#173c2c] shadow-2xs{% endif %}"
+                  data-sidebar-group-id="{{ grp.id }}" data-open-group-id="{{ grp.id }}" hx-post="/groups/open" hx-vals='{"group_id": "{{ grp.id }}"}' hx-select="main" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/groups" hx-indicator="#chat-loading">
                   <span class="sidebar-group-avatar grid h-5 w-5 place-items-center rounded-md bg-stone-200 text-[10px] font-bold text-stone-700 flex-none">{{ grp.name[:2]|upper }}</span>
                   <span class="sidebar-group-name truncate flex-1 font-medium text-xs text-stone-800">{{ grp.name }}</span>
                   {% if grp.is_admin %}

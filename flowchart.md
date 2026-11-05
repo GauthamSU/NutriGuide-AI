@@ -133,6 +133,33 @@ flowchart TD
     EndNode -->|final NutriGuideState| EndpointMulti
     EndpointText -->|200 OK NutrientAnalysisResponseSchema| Client
     EndpointMulti -->|200 OK NutrientAnalysisResponseSchema| Client
+
+    %% ==========================================
+    %% PIPELINE 7: PYSCRIPT PURE-PYTHON FRONTEND & RECIPE CUSTOMIZER
+    %% ==========================================
+    subgraph PyScript_Frontend ["G. Pure Python PyScript Frontend Architecture (Zero-JS Policy)"]
+        BrowserUI["Browser DOM UI<br/>(Tailwind CSS + Jinja Templates)"]:::client
+        PyScriptRuntime["PyScript / Pyodide WebAssembly<br/>(web_frontend/src/main.py)<br/>• Zero JavaScript Application Code<br/>• @when('click', 'body') Event Delegation<br/>• Pure Python Modals, State & DOM Updates"]:::graphNode
+        RecipeCustomizer["Household Recipe Customizer<br/>(web_frontend/src/chat.py)<br/>• In-place ingredients form transformation<br/>• Delete confirmation popup modal<br/>• Quick-add staples: Ghee, Coconut oil, Peanuts<br/>• Serializes customized ingredients JSON"]:::service
+        PyScriptFetch["PyScript Async Fetch<br/>(window.fetch in chat.py)<br/>• Serializes DOM inputs directly<br/>• Direct outerHTML DOM swap<br/>• Pure Python, Zero JavaScript"]:::pipeline
+
+        BrowserUI -->|user click / edit| PyScriptRuntime
+        PyScriptRuntime -->|triggers| RecipeCustomizer
+        RecipeCustomizer -->|posts JSON payload| PyScriptFetch
+        PyScriptFetch -->|POST /chats/.../customize-recipe| FrontendProxy["Frontend Server (server.py)<br/>Proxy & Jinja Fragment Renderer"]:::api
+    end
+
+    subgraph Customization_Backend ["H. Recipe Personalization & Recommendation Engine"]
+        CustomService["customize_dish_recipe()<br/>(backend/assistant/services.py)<br/>• Resolves custom ingredients against IFCT DB<br/>• Recalculates full macros & micros<br/>• Cascades updates to TrackedMeal"]:::service
+        UserCustomRecipeDB[("UserCustomRecipe Table<br/>(core_app.sqlite3)<br/>• Stores AI suggested & user customized title/description<br/>• Stores original vs custom ingredients & portions<br/>• Household memory for future LLM dish calls<br/>• Ground-truth for recommendation models")]:::storage
+        
+        FrontendProxy -->|POST api/chat-history/.../customize-recipe| CustomService
+        CustomService -->|queries IFCT| FoodCore
+        CustomService -->|queries IFCT| Satellites
+        CustomService -->|persists user edits| UserCustomRecipeDB
+        CustomService -->|returns updated nutrition| FrontendProxy
+        FrontendProxy -->|renders nutrition_results.html| BrowserUI
+    end
 ```
 
 ---
@@ -156,3 +183,15 @@ flowchart TD
 - **Node 3 & Memoized Database Cache**: `_FOOD_LOOKUP_CACHE` memoizes both hits and unmapped misses to guarantee 0 redundant ORM queries.
 - **Node 4 (Agentic Decomposition Loop)**: Automatically identifies unmapped or composite culinary items (such as `Rice batter` or `Chilli powder`) and prompts the LLM to break them down into raw constituent ingredients (e.g. `Rice` + `Urad dal`, or `Chillies, red`) with proportional weights. Loops back to Node 3 to resolve sub-ingredients without repeating previous queries.
 - **Llama.cpp Client**: Communicates with local `llama-server.exe` running Gemma 4 E2B with Pydantic JSON schema constraints.
+
+### 4. Pure Python Frontend (Zero-JavaScript Architecture)
+- **Zero-JS Requirement**: The entire frontend is authored strictly in Python using PyScript (Pyodide WebAssembly) and HTMX. No `.js` files or inline JS attributes are allowed.
+- **Event Coordination (`web_frontend/src/main.py`)**: Central Python event delegator using `@when` decorators to intercept DOM clicks, changes, and submissions.
+- **Modular Domain Services**: Dedicated Python modules for `chat.py`, `tracker.py`, `groups.py`, `meal_planner.py`, `profile.py`, and `ui.py`.
+
+### 5. Household Recipe Customization & Personalization Engine
+- **In-Place UI Editing**: Replaces static ingredient lists with an editable form in the exact same card container without page reloads.
+- **Interactive Controls**: Editable ingredient names, portions, weights (grams), delete buttons with confirmation modals, and quick-add chips for Indian cooking staples.
+- **Nutrient Recalculation**: Recomputes calories, macros, and micronutrients against the verified IFCT 2017 dataset.
+- **`UserCustomRecipe` Persistence**: Captures user edits to power personalized recommendation engines and localized model fine-tuning.
+- **Household Memory**: Re-injects previous household ingredient customizations into future LLM dish identification steps.

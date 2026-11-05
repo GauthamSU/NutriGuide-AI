@@ -313,9 +313,136 @@ Food.objects.select_related("minerals", "organic_acids").get(food_code="C001")
 
 ---
 
-## 4. Future Database Design Diagrams
+## 4. Application Database Schema (`core_app.sqlite3`)
 
-*(Add subsequent application ER diagrams below as features such as user authentication, daily food logs, meal plans, custom recipes, and vector embedding stores are developed.)*
+NutriGuide-AI partitions application state into a primary writable database (`core_app.sqlite3` routed via `CoreAppDatabaseRouter`), completely separated from the read-only IFCT reference database (`db.sqlite3`).
 
-### Placeholder: User Management & Dietary History (Planned)
-*Future schema for user profiles, biometric targets (age, sex, weight, BMR, TDEE), meal logs, and timestamped intake records.*
+### Entity-Relationship Diagram: Application & Household Personalization
+
+```mermaid
+erDiagram
+    User ||--o{ ChatConversation : "owns (1:N)"
+    User ||--o{ UserCustomRecipe : "customizes (1:N)"
+    User ||--o{ TrackedMeal : "logs (1:N)"
+    User ||--o{ MealPlanHistory : "generates (1:N)"
+    User ||--o{ NutritionGroup : "creates (1:N)"
+    User ||--o{ GroupMembershipRequest : "requests (1:N)"
+    User ||--o{ GroupMealLog : "shares (1:N)"
+
+    ChatConversation ||--o{ ChatMessage : "contains (1:N)"
+    ChatMessage ||--o| UserCustomRecipe : "customizes recipe (1:1)"
+    ChatMessage ||--o| TrackedMeal : "cascades to (1:1)"
+
+    NutritionGroup ||--o{ GroupMembershipRequest : "manages (1:N)"
+    NutritionGroup ||--o{ GroupMealLog : "aggregates (1:N)"
+
+    UserCustomRecipe {
+        uuid id PK "Primary key"
+        string owner_id "Owner UUID string (Indexed)"
+        int user_id FK "Optional Django auth user reference"
+        string dish_name "User customized dish title, e.g., 'My Homemade Avalakki' (Indexed)"
+        text description "User customized dish description / summary"
+        string ai_dish_name "Original baseline AI suggested dish title, e.g., 'Avalakki'"
+        text ai_description "Original baseline AI suggested dish description / recognized input summary"
+        string conversation_id "Originating chat conversation ID"
+        string message_id "Originating chat message ID (Indexed)"
+        json original_ingredients "Baseline AI detected ingredients"
+        json customized_ingredients "Household-edited ingredients & weights"
+        json total_macronutrients "Recalculated calories & macros from IFCT"
+        json total_micronutrients "Recalculated vitamins & minerals from IFCT"
+        text notes "Optional kitchen/family notes"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update timestamp (Indexed)"
+    }
+
+    ChatConversation {
+        uuid id PK "Conversation UUID"
+        string owner_id "Partition owner UUID (Indexed)"
+        string title "Conversation title"
+        datetime created_at "Created timestamp"
+        datetime updated_at "Updated timestamp"
+    }
+
+    ChatMessage {
+        uuid id PK "Message UUID"
+        uuid conversation_id FK "References ChatConversation.id"
+        text user_query "User submitted query"
+        text transcription "Whisper/LLM audio transcription"
+        json input_modalities "['text', 'image', 'voice']"
+        json ai_response "Dish name, ingredients list, dietary tags"
+        boolean logged_to_tracker "Logged to diary flag"
+        string image "Relative media image path"
+        string audio "Relative media audio path"
+        datetime created_at "Message timestamp"
+    }
+
+    TrackedMeal {
+        int id PK "Primary key"
+        string owner_id "User owner UUID"
+        string conversation_id "Source conversation ID"
+        string source_message_id "Source chat message ID"
+        string meal_title "Logged meal title"
+        string category "Breakfast, Lunch, Dinner, Snack"
+        datetime consumed_at "Meal consumption time"
+        json macronutrients "Calories, protein, carbs, fat, fiber"
+        json items "Constituent ingredient records"
+    }
+
+    MealPlanHistory {
+        int id PK "Primary key"
+        string owner_id "User owner UUID"
+        string plan_title "Title of the generated meal plan"
+        int target_calories "Caloric goal"
+        string diet_type "Vegetarian, Vegan, Non-Veg, etc."
+        json plan_data "Structured multi-day meal schedule"
+        datetime created_at "Generation timestamp"
+    }
+
+    NutritionGroup {
+        int id PK "Primary key"
+        string name "Group name"
+        string description "Group description"
+        string join_code "Unique shareable join code"
+        string visibility "public or private"
+        int creator_id FK "References User.id"
+        datetime created_at "Creation timestamp"
+    }
+
+    GroupMealLog {
+        int id PK "Primary key"
+        int group_id FK "References NutritionGroup.id"
+        int user_id FK "References User.id"
+        string dish_name "Shared dish name"
+        string meal_type "Meal category"
+        json nutrition_summary "Shared macros summary"
+        string photo_url "Optional dish photo"
+        datetime logged_at "Post timestamp"
+    }
+```
+
+---
+
+## 5. Dual-Database Partitioning Architecture
+
+NutriGuide-AI enforces a strict architectural boundary between reference data and application state:
+
+| Database Alias | Physical File | Access Mode | Contents & Responsibilities |
+| :--- | :--- | :---: | :--- |
+| **`nutrition`** | `db.sqlite3` | **Read-Only** | ICMR-NIN IFCT 2017 scientific reference tables (`Food`, `FoodGroup`, `FoodVernacularName`, and all 10 nutrient satellite tables). |
+| **`default`** | `core_app.sqlite3` | **Read-Write** | Application users, authentication, `UserCustomRecipe`, `ChatMessage`, `TrackedMeal`, `MealPlanHistory`, and `NutritionGroup`. |
+
+### Database Routing (`CoreAppDatabaseRouter`)
+- Routes all reads and writes for `app_label == 'nutrition'` to the `nutrition` alias.
+- Routes all other models (`chat_history`, `auth`, `admin`, `sessions`) to the `default` alias.
+- Prevents cross-database foreign key constraints at the database engine level while maintaining loose foreign UUID linkages in application services.
+
+---
+
+## 6. Frontend Architectural Guidelines (Pure Python / PyScript Policy)
+
+> [!IMPORTANT]
+> **Strict Rule for Engineering & AI Agents**:
+> NutriGuide-AI's frontend contains **zero JavaScript application files**.
+> - Client-side state coordination, modal dialogs, and DOM mutations MUST be written strictly in Python under `web_frontend/src/` via PyScript.
+> - Network requests and DOM swaps are driven declaratively by HTMX.
+> - Never inject JavaScript code, `<script>` tags, or inline JS attributes (`onclick`, `onsubmit`, etc.) into HTML templates.

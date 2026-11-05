@@ -15,12 +15,12 @@
     </div>
     {% elif group %}
 
-    <!-- Discord / WhatsApp Community Header Banner -->
+    <!-- Community Header Banner -->
     <div class="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-xs mb-6">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div class="flex items-start md:items-center gap-4 min-w-0">
           <!-- Community Initial Icon Avatar -->
-          <div class="h-16 w-16 rounded-2xl bg-[#245c43] text-white flex items-center justify-center font-bold text-2xl flex-none shadow-xs">
+          <div class="h-16 w-16 rounded-2xl bg-[#173c2c] text-white flex items-center justify-center font-bold text-2xl flex-none shadow-xs">
             {{ group.name[:2]|upper }}
           </div>
           <div class="min-w-0 flex-1">
@@ -41,10 +41,9 @@
                   group.created_by }}</strong></span>
             </div>
 
-            <h1 class="font-serif m-0 text-2xl sm:text-3xl font-normal text-[#173c2c] truncate">{{ group.name }}</h1>
+            <h1 class="font-serif m-0 text-2xl sm:text-3xl font-bold text-[#173c2c] truncate">{{ group.name }}</h1>
             <p class="m-0 mt-1.5 text-xs sm:text-sm text-[#53645a] leading-relaxed max-w-2xl">
-              {{ group.description or "Shared collective nutrition group for tracking meals, macros, and healthy
-              lifestyle habits together." }}
+              {{ group.description or "Shared collective nutrition group for tracking meals, macros, and healthy lifestyle habits together." }}
             </p>
           </div>
         </div>
@@ -62,49 +61,151 @@
       </div>
     </div>
 
-    <!-- Collective Nutrition Stats Banner -->
+    <!-- Collective Nutrition Stats Banner + Collective Progress Bars -->
+    {% set tot_members = [group.collective.total_members or 1, 1]|max %}
+    {% set c_cal = group.collective.total_calories_kcal or 0 %}
+    {% set c_prot = group.collective.total_protein_g or 0 %}
+    {% set c_carb = group.collective.total_carbohydrates_g or 0 %}
+    {% set c_fat = group.collective.total_fat_g or 0 %}
+    {% set c_fib = group.collective.total_fiber_g or 0 %}
+
+    {% set goal_cal = tot_members * 2000.0 %}
+    {% set goal_prot = tot_members * 60.0 %}
+    {% set goal_carb = tot_members * 250.0 %}
+    {% set goal_fat = tot_members * 65.0 %}
+    {% set goal_fib = tot_members * 30.0 %}
+
+    {% set pct_cal = [((c_cal / goal_cal) * 100)|round|int, 100]|min %}
+    {% set pct_prot = [((c_prot / goal_prot) * 100)|round|int, 100]|min %}
+    {% set pct_carb = [((c_carb / goal_carb) * 100)|round|int, 100]|min %}
+    {% set pct_fat = [((c_fat / goal_fat) * 100)|round|int, 100]|min %}
+    {% set pct_fib = [((c_fib / goal_fib) * 100)|round|int, 100]|min %}
+
     <div>
-      <div class="mb-3.5 flex items-center justify-between">
+      <div class="mb-3.5 flex flex-wrap items-center justify-between gap-2">
         <h3 class="m-0 text-xs font-bold uppercase tracking-[1px] text-[#245c43] flex items-center gap-2">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
-          <span>Collective Group Nutrition Totals</span>
+          <span>Collective Group Nutrition &amp; Goal Progress</span>
         </h3>
         <span class="text-xs font-semibold text-[#53645a]">
           {{ group.collective.total_meals_count }} meals logged across {{ group.collective.total_members }} members
         </span>
       </div>
-      <div class="collective-stats-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-6">
-        <div class="collective-stat-card collective-stat-primary flex flex-col justify-between p-4 rounded-2xl border border-emerald-300 bg-gradient-to-br from-[#245c43] to-[#173c2c] text-white shadow-xs">
-          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-emerald-200">Collective Calories</span>
-          <strong class="font-serif collective-stat-value text-2xl sm:text-3xl font-bold my-1 leading-tight text-white">{{ (group.collective.total_calories_kcal or 0)|round|int }}
-            <small class="text-xs font-normal text-emerald-200">kcal</small></strong>
-          <span class="collective-stat-sub text-[11px] text-emerald-200">{{ (group.collective.average_calories_per_member or 0)|round|int }} kcal avg / member</span>
+
+      <div class="collective-stats-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-4">
+        <div class="collective-stat-card collective-stat-primary flex flex-col justify-between p-4 rounded-2xl border border-[#173c2c] bg-[#173c2c] text-white shadow-xs">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-emerald-200">Collective Calories</span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-800 text-emerald-100">{{ pct_cal }}%</span>
+            </div>
+            <strong class="font-serif collective-stat-value text-2xl sm:text-3xl font-bold my-1.5 block leading-tight text-white">{{ c_cal|round|int }}
+              <small class="text-xs font-normal text-emerald-200">kcal</small></strong>
+          </div>
+          <div>
+            <div class="h-1.5 w-full rounded-full bg-emerald-950 overflow-hidden mb-1.5">
+              <div class="h-full rounded-full bg-emerald-400" style="width: {{ pct_cal }}%"></div>
+            </div>
+            <span class="collective-stat-sub text-[11px] text-emerald-200">{{ (group.collective.average_calories_per_member or 0)|round|int }} kcal avg / member</span>
+          </div>
         </div>
+
         <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
-          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Protein</span>
-          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_protein_g or 0 }}
-            <small class="text-xs font-normal text-stone-500">g</small></strong>
-          <span class="collective-stat-sub text-[11px] text-stone-500">Muscle &amp; recovery</span>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Protein</span>
+              <span class="text-[10px] font-bold text-[#245c43]">{{ pct_prot }}%</span>
+            </div>
+            <strong class="font-serif collective-stat-value text-2xl font-bold my-1.5 block text-[#173c2c]">{{ c_prot }}
+              <small class="text-xs font-normal text-stone-500">g</small></strong>
+          </div>
+          <div>
+            <div class="h-1.5 w-full rounded-full bg-stone-100 overflow-hidden mb-1.5">
+              <div class="h-full rounded-full bg-[#245c43]" style="width: {{ pct_prot }}%"></div>
+            </div>
+            <span class="collective-stat-sub text-[11px] text-stone-500">Goal: {{ goal_prot|round|int }}g collective</span>
+          </div>
         </div>
+
         <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
-          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Carbs</span>
-          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_carbohydrates_g or 0 }}
-            <small class="text-xs font-normal text-stone-500">g</small></strong>
-          <span class="collective-stat-sub text-[11px] text-stone-500">Daily energy fuel</span>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Carbs</span>
+              <span class="text-[10px] font-bold text-amber-700">{{ pct_carb }}%</span>
+            </div>
+            <strong class="font-serif collective-stat-value text-2xl font-bold my-1.5 block text-[#173c2c]">{{ c_carb }}
+              <small class="text-xs font-normal text-stone-500">g</small></strong>
+          </div>
+          <div>
+            <div class="h-1.5 w-full rounded-full bg-stone-100 overflow-hidden mb-1.5">
+              <div class="h-full rounded-full bg-amber-500" style="width: {{ pct_carb }}%"></div>
+            </div>
+            <span class="collective-stat-sub text-[11px] text-stone-500">Goal: {{ goal_carb|round|int }}g collective</span>
+          </div>
         </div>
+
         <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
-          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Fat</span>
-          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_fat_g or 0 }} <small class="text-xs font-normal text-stone-500">g</small></strong>
-          <span class="collective-stat-sub text-[11px] text-stone-500">Essential lipids</span>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Fat</span>
+              <span class="text-[10px] font-bold text-orange-700">{{ pct_fat }}%</span>
+            </div>
+            <strong class="font-serif collective-stat-value text-2xl font-bold my-1.5 block text-[#173c2c]">{{ c_fat }} <small class="text-xs font-normal text-stone-500">g</small></strong>
+          </div>
+          <div>
+            <div class="h-1.5 w-full rounded-full bg-stone-100 overflow-hidden mb-1.5">
+              <div class="h-full rounded-full bg-orange-500" style="width: {{ pct_fat }}%"></div>
+            </div>
+            <span class="collective-stat-sub text-[11px] text-stone-500">Goal: {{ goal_fat|round|int }}g collective</span>
+          </div>
         </div>
+
         <div class="collective-stat-card flex flex-col justify-between p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs">
-          <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Dietary Fiber</span>
-          <strong class="font-serif collective-stat-value text-2xl font-bold my-1 text-[#173c2c]">{{ group.collective.total_fiber_g or 0 }}
-            <small class="text-xs font-normal text-stone-500">g</small></strong>
-          <span class="collective-stat-sub text-[11px] text-stone-500">Digestive wellness</span>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="collective-stat-label text-[10px] font-bold uppercase tracking-wider text-stone-500">Dietary Fiber</span>
+              <span class="text-[10px] font-bold text-sky-700">{{ pct_fib }}%</span>
+            </div>
+            <strong class="font-serif collective-stat-value text-2xl font-bold my-1.5 block text-[#173c2c]">{{ c_fib }}
+              <small class="text-xs font-normal text-stone-500">g</small></strong>
+          </div>
+          <div>
+            <div class="h-1.5 w-full rounded-full bg-stone-100 overflow-hidden mb-1.5">
+              <div class="h-full rounded-full bg-sky-600" style="width: {{ pct_fib }}%"></div>
+            </div>
+            <span class="collective-stat-sub text-[11px] text-stone-500">Goal: {{ goal_fib|round|int }}g collective</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collective Macro Balance & Momentum Progress Bar Card -->
+      {% set p_cal = c_prot * 4.0 %}
+      {% set cb_cal = c_carb * 4.0 %}
+      {% set f_cal = c_fat * 9.0 %}
+      {% set tot_m_cal = [p_cal + cb_cal + f_cal, 1.0]|max %}
+      {% set p_split = ((p_cal / tot_m_cal) * 100)|round|int if (p_cal + cb_cal + f_cal) > 0 else 25 %}
+      {% set cb_split = ((cb_cal / tot_m_cal) * 100)|round|int if (p_cal + cb_cal + f_cal) > 0 else 50 %}
+      {% set f_split = [100 - p_split - cb_split, 0]|max %}
+
+      <div class="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5 shadow-2xs mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-[#173c2c]">Collective Caloric Macro Distribution</span>
+            <span class="text-[11px] text-stone-500">({{ group.collective.total_meals_count }} group meals analyzed)</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 text-xs font-semibold">
+            <span class="inline-flex items-center gap-1.5 text-[#173c2c]"><i class="h-2.5 w-2.5 rounded-full bg-[#245c43]"></i>Protein {{ p_split }}%</span>
+            <span class="inline-flex items-center gap-1.5 text-amber-900"><i class="h-2.5 w-2.5 rounded-full bg-amber-500"></i>Carbs {{ cb_split }}%</span>
+            <span class="inline-flex items-center gap-1.5 text-orange-900"><i class="h-2.5 w-2.5 rounded-full bg-orange-500"></i>Fat {{ f_split }}%</span>
+          </div>
+        </div>
+        <div class="h-2.5 w-full rounded-full bg-stone-100 overflow-hidden flex">
+          <div class="h-full bg-[#245c43] transition-all duration-300" style="width: {{ p_split }}%"></div>
+          <div class="h-full bg-amber-500 transition-all duration-300" style="width: {{ cb_split }}%"></div>
+          <div class="h-full bg-orange-500 transition-all duration-300" style="width: {{ f_split }}%"></div>
         </div>
       </div>
     </div>
@@ -126,7 +227,7 @@
             calories and macronutrients from the food database.
           </p>
 
-          <form id="group-page-log-meal-form" class="space-y-4" novalidate>
+          <form id="group-page-log-meal-form" method="post" action="/groups/meals" class="space-y-4" novalidate>
             <input type="hidden" name="group_id" value="{{ group.id }}">
 
             <!-- Hidden File Inputs for Multimodal Capture -->
@@ -212,7 +313,7 @@
                   d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
               </svg>
               <span><strong>AI Database Resolution:</strong> Calories, proteins, carbs, fats, and fiber are calculated
-                automatically from the nutrition database. No manual calorie typing required.</span>
+                automatically from the nutrition database. You can also share meals directly from your Personal Tracker!</span>
             </div>
 
             <!-- Feedback Alert Container -->
@@ -220,7 +321,7 @@
 
             <!-- Submit Row -->
             <div class="flex items-center justify-between pt-3 border-t border-[#f0f3ee]">
-              <span class="text-xs text-[#6d7871]">Shares directly to {{ group.name }}'s collective log.</span>
+              <span class="text-xs text-[#6d7871]">Shares directly to {{ group.name }}'s collective log &amp; leaderboard.</span>
               <button type="submit" id="group-page-log-meal-btn" class="btn-primary !py-2.5 !px-5 !text-xs font-bold">
                 <span>+ Post Meal to Group</span>
               </button>
@@ -290,41 +391,45 @@
                 {% endif %}
               </div>
 
-              <!-- Clean Professional Macronutrient Badges Grid (No Emojis) -->
+              <!-- Macronutrient Badges Grid -->
               <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-stone-100">
-                <span class="feed-macro-badge calories px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-[#173c2c] border border-emerald-200">{{ (meal.calories_kcal or 0)|round|int }} kcal</span>
-                <span class="feed-macro-badge protein px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">Protein: {{ meal.protein_g }}g</span>
+                <span class="feed-macro-badge calories px-2.5 py-1 rounded-lg text-xs font-bold bg-[#173c2c] text-white">{{ (meal.calories_kcal or 0)|round|int }} kcal</span>
+                <span class="feed-macro-badge protein px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-[#173c2c] border border-emerald-200">Protein: {{ meal.protein_g }}g</span>
                 <span class="feed-macro-badge carbs px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">Carbs: {{ meal.carbohydrates_g }}g</span>
-                <span class="feed-macro-badge fat px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">Fat: {{ meal.total_fat_g }}g</span>
+                <span class="feed-macro-badge fat px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-900 border border-orange-200">Fat: {{ meal.total_fat_g }}g</span>
                 {% if meal.dietary_fiber_g %}
-                <span class="feed-macro-badge fiber px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">Fiber: {{ meal.dietary_fiber_g }}g</span>
+                <span class="feed-macro-badge fiber px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-50 text-sky-900 border border-sky-200">Fiber: {{ meal.dietary_fiber_g }}g</span>
                 {% endif %}
               </div>
             </article>
             {% endfor %}
             {% else %}
-            <div class="rounded-2xl border border-dashed border-[#d5ded4] bg-white p-8 text-center shadow-xs">
+            <div class="rounded-2xl border border-dashed border-stone-300 bg-white p-8 sm:p-10 text-center shadow-2xs">
               <div
-                class="inline-grid h-12 w-12 place-items-center rounded-full bg-[#f4f8f2] text-[#245c43] mb-2 mx-auto">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                class="inline-grid h-14 w-14 place-items-center rounded-2xl bg-emerald-100/80 text-[#173c2c] border border-emerald-200 mb-3 mx-auto">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path
                     d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
                   <path d="M10 2c1 .5 2 2 2 5" />
                 </svg>
               </div>
-              <h4 class="font-serif m-0 text-lg text-[#173c2c]">No meals logged in this group yet</h4>
-              <p class="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[#6d7871]">
-                Be the first to share what you ate today! Post a meal using the composer above to start building
-                collective nutrition insights for {{ group.name }}.
+              <h4 class="font-serif m-0 text-xl font-bold text-[#173c2c]">Kick Off {{ group.name }}'s Nutrition Feed!</h4>
+              <p class="mx-auto mt-1.5 max-w-md text-xs sm:text-sm leading-relaxed text-stone-600">
+                No meals have been shared in this group yet. Log your first dish using the composer above or share directly from your Personal Nutrient Tracker to claim the #1 spot on the group leaderboard!
               </p>
+              <div class="mt-4">
+                <button type="button" class="btn-primary !py-2.5 !px-5 !text-xs font-bold jump-to-post-meal-btn">
+                  + Share First Group Meal →
+                </button>
+              </div>
             </div>
             {% endif %}
           </div>
         </div>
       </div>
 
-      <!-- Right Column: Sidebar (Community Members Roster, Admin Controls, Info) -->
+      <!-- Right Column: Sidebar (Visual Member Leaderboard, Admin Controls, Info) -->
       <div class="lg:col-span-4 space-y-6 sm:space-y-7 min-w-0">
 
         {% if group.is_admin %}
@@ -345,7 +450,7 @@
           <div>
             <h4 class="m-0 mb-1 text-xs font-bold text-[#173c2c]">Invite Member to Group</h4>
             <p class="m-0 mb-2 text-xs text-[#53645a]">Send an invitation directly to a user by username or email:</p>
-            <form id="group-page-add-member-form" class="space-y-2">
+            <form id="group-page-add-member-form" method="post" action="/groups/members" class="space-y-2">
               <input type="hidden" name="group_id" value="{{ group.id }}">
               <div class="flex items-center gap-2">
                 <input type="text" name="identifier" id="group-invite-identifier" placeholder="Enter username or email…"
@@ -417,48 +522,63 @@
         </div>
         {% endif %}
 
-        <!-- Members Roster Card -->
-        <div class="rounded-2xl border border-[#dce2da] bg-white p-5 sm:p-6 shadow-xs">
-          <div class="flex items-center justify-between border-b border-[#e9ede6] pb-3 mb-3.5 ">
-            <h3 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#245c43] flex items-center gap-1.5">
+        <!-- Visual Member Leaderboard & Roster Card -->
+        <div class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
+          <div class="flex items-center justify-between border-b border-stone-100 pb-3 mb-3.5">
+            <h3 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#173c2c] flex items-center gap-1.5">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
               </svg>
-              <span>Community Members ({{ group.members|length }})</span>
+              <span>Member Leaderboard ({{ group.members|length }})</span>
             </h3>
+            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-[#245c43] border border-emerald-200">Ranked</span>
           </div>
 
-          <!-- Members List with Clean Sized Avatars -->
-          <div class="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+          <!-- Leaderboard List with Contribution Progress Bars -->
+          {% set max_cal = [c_cal, 2000.0]|max %}
+          <div class="space-y-3 max-h-[520px] overflow-y-auto pr-1">
             {% for m in group.members %}
-            <div
-              class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#f6f9f5] border border-transparent hover:border-[#e2ebd0] transition">
-              <div class="member-roster-avatar h-8 w-8 rounded-full bg-emerald-100 text-[#173c2c] border border-emerald-200 flex items-center justify-center text-xs font-bold flex-none overflow-hidden">
-                {% if m.profile_picture %}
-                <img src="{{ m.profile_picture }}" alt="{{ m.name or m.username }}" class="h-full w-full object-cover">
-                {% else %}
-                <span>{{ (m.name or m.username)[:2]|upper }}</span>
-                {% endif %}
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1.5">
-                  <strong class="truncate text-xs font-bold text-[#173c2c]">{{ m.name or m.username }}</strong>
-                  {% if m.role == 'admin' %}
-                  <span class="badge-pill badge-green !py-0 !px-1.5 !text-[11px] font-bold">Admin</span>
+            {% set m_cal = ((m.nutrition.calories_kcal if m.nutrition else 0) or 0)|round|int %}
+            {% set m_prot = ((m.nutrition.protein_g if m.nutrition else 0) or 0)|round(1) %}
+            {% set m_meals = (m.nutrition.meals_count if m.nutrition else 0) or 0 %}
+            {% set m_pct = [((m_cal / max_cal) * 100)|round|int, 100]|min if m_cal > 0 else 4 %}
+            <div class="p-3 rounded-xl bg-stone-50/70 hover:bg-emerald-50/40 border border-stone-200/80 hover:border-emerald-300 transition space-y-2">
+              <div class="flex items-center gap-2.5">
+                <!-- Rank Badge -->
+                <span class="flex h-6 w-6 items-center justify-center rounded-lg text-[10px] font-bold flex-none {{ 'bg-[#173c2c] text-white' if loop.index == 1 else ('bg-amber-100 text-amber-900 border border-amber-300' if loop.index == 2 else ('bg-emerald-100 text-emerald-900 border border-emerald-200' if loop.index == 3 else 'bg-stone-200 text-stone-700')) }}">
+                  #{{ loop.index }}
+                </span>
+
+                <div class="member-roster-avatar h-8 w-8 rounded-full bg-emerald-100 text-[#173c2c] border border-emerald-200 flex items-center justify-center text-xs font-bold flex-none overflow-hidden">
+                  {% if m.profile_picture %}
+                  <img src="{{ m.profile_picture }}" alt="{{ m.name or m.username }}" class="h-full w-full object-cover">
+                  {% else %}
+                  <span>{{ (m.name or m.username)[:2]|upper }}</span>
                   {% endif %}
                 </div>
-                <span class="block truncate text-xs text-[#6d7871]">
-                  @{{ m.username }} · Joined {{ m.joined_at[:10] }}
-                </span>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <strong class="truncate text-xs font-bold text-[#173c2c]">{{ m.name or m.username }}</strong>
+                    {% if m.role == 'admin' %}
+                    <span class="badge-pill badge-green !py-0 !px-1.5 !text-[10px] font-bold">Admin</span>
+                    {% endif %}
+                  </div>
+                  <span class="block truncate text-[11px] text-stone-500">
+                    @{{ m.username }} · {{ m_meals }} {{ 'meal' if m_meals == 1 else 'meals' }}
+                  </span>
+                </div>
+
+                <div class="text-right flex-none">
+                  <strong class="block text-xs font-bold text-[#173c2c]">{{ m_cal }} kcal</strong>
+                  <span class="block text-[10px] font-semibold text-[#245c43]">{{ m_prot }}g protein</span>
+                </div>
               </div>
-              <div class="text-right flex-none">
-                <strong class="block text-xs font-bold text-[#245c43]">{{ ((m.nutrition.calories_kcal if m.nutrition
-                  else 0) or 0)|round|int }} kcal</strong>
-                <span class="block text-xs text-[#6d7871]">{{ m.nutrition.meals_count }} meals</span>
+
+              <!-- Member Contribution Bar -->
+              <div class="h-1.5 w-full rounded-full bg-stone-200/80 overflow-hidden">
+                <div class="h-full rounded-full bg-[#245c43] transition-all duration-300" style="width: {{ m_pct }}%"></div>
               </div>
             </div>
             {% endfor %}
@@ -466,7 +586,7 @@
         </div>
 
         <!-- Community Guidelines / Activity Card -->
-        <div class="rounded-2xl border border-[#dce2da] bg-white p-5 sm:p-6 shadow-xs">
+        <div class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
           <h4 class="m-0 text-xs font-bold uppercase tracking-[0.8px] text-[#245c43] flex items-center gap-1.5 mb-2.5">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

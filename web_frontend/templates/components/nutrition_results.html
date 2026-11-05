@@ -1,4 +1,4 @@
-<section class="assistant-turn min-w-0 w-full max-w-full" aria-label="Nutrition analysis">
+<section class="assistant-turn min-w-0 w-full max-w-full" {% if result and (turn_id or result.message_id) %}id="results-{{ turn_id or result.message_id }}"{% endif %} aria-label="Nutrition analysis">
   {% if result %}
     {% set analysis = result.analysis %}
     {% set is_logged = logged_to_tracker or result.logged_to_tracker %}
@@ -9,12 +9,18 @@
       <div class="flex items-center gap-2 text-xs font-semibold text-stone-600">
         <span class="flex h-7 w-7 items-center justify-center rounded-[8px_8px_8px_2px] bg-[#245c43] text-sm font-bold text-[#d7ed9f]">N</span>
         <span class="text-stone-800 font-bold">NutriGuide</span>
+        {% if result.is_customized %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-[10px] font-bold text-[#173c2c]" title="Customized for your household kitchen">
+            ✓ Household Recipe
+          </span>
+        {% endif %}
       </div>
 
       <!-- Turn Action Bar: Log to Tracker & Delete Message -->
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
+          id="turn-log-btn-{{ msg_id }}"
           class="turn-action-btn {{ 'turn-action-logged inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 opacity-90 cursor-default' if is_logged else 'turn-action-log inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100/90 text-[#173c2c] border border-emerald-200 shadow-xs transition cursor-pointer' }}"
           data-log-to-tracker-btn
           data-message-id="{{ msg_id }}"
@@ -55,29 +61,83 @@
 
     <script type="application/json" data-turn-analysis-json>{{ analysis | tojson }}</script>
 
-    <h2 class="font-serif mb-1 text-[24px] sm:text-[27px] font-bold text-[#173c2c] leading-tight">{{ analysis.meal_title or "Meal analysis" }}</h2>
+    <div class="mb-1 flex items-start justify-between gap-3">
+      <div class="min-w-0 flex-1">
+        <h2 id="turn-dish-title-{{ msg_id }}" class="font-serif text-[24px] sm:text-[27px] font-bold text-[#173c2c] leading-tight">
+          {{ analysis.meal_title or "Meal analysis" }}
+        </h2>
+        {% if result.is_customized and (result.ai_dish_name or result.original_dish_name) and (result.ai_dish_name or result.original_dish_name) != (analysis.meal_title or '') %}
+          <p class="text-[11px] text-stone-400 mt-0.5">
+            AI suggested: <span class="italic text-stone-500 font-medium">{{ result.ai_dish_name or result.original_dish_name }}</span>
+          </p>
+        {% endif %}
+      </div>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-stone-600 hover:text-[#173c2c] hover:bg-emerald-50 border border-stone-200 hover:border-emerald-300 rounded-xl transition cursor-pointer flex-none mt-0.5"
+        data-toggle-recipe-mode="{{ msg_id }}"
+        title="Edit dish title, description, and ingredients"
+        aria-label="Edit dish title, description, and ingredients"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span>Edit</span>
+      </button>
+    </div>
     {% if result.transcription %}
       <p class="mb-3 rounded-xl bg-emerald-50/80 border border-emerald-100 p-3 text-xs leading-relaxed text-[#245c43]">
         <strong class="font-bold">AI audio transcription:</strong> {{ result.transcription }}
       </p>
     {% endif %}
     {% if analysis.recognized_input_summary %}
-      <p class="mb-4 text-xs sm:text-sm leading-relaxed text-stone-600">{{ analysis.recognized_input_summary }}</p>
+      <p id="turn-dish-desc-{{ msg_id }}" class="mb-4 text-xs sm:text-sm leading-relaxed text-stone-600">{{ analysis.recognized_input_summary }}</p>
+    {% else %}
+      <p id="turn-dish-desc-{{ msg_id }}" class="mb-4 text-xs sm:text-sm leading-relaxed text-stone-600 hidden"></p>
     {% endif %}
 
     <!-- Nutrients Card -->
     <div class="mb-5 rounded-2xl border border-stone-200 bg-white p-4 sm:p-6 shadow-xs">
-      <div class="flex items-baseline justify-between border-b border-stone-100 pb-3 mb-4">
+      <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-100 pb-3 mb-4">
         <div>
-          <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Calories</p>
-          <p class="font-serif text-3xl sm:text-4xl font-bold text-[#173c2c] leading-none mt-1">
-            {{ "%.0f"|format(macros.get("calories_kcal", 0)) }} <span class="font-sans text-sm font-medium text-stone-500">kcal</span>
+          <div class="flex items-center gap-2">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-500 m-0">Total Calories</p>
+            <span id="turn-live-badge-{{ msg_id }}" class="hidden items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+              ⚡ Live Recalculated Preview
+            </span>
+          </div>
+          <p class="font-serif text-3xl sm:text-4xl font-bold text-[#173c2c] leading-none mt-1 m-0">
+            <span id="turn-total-calories-{{ msg_id }}" data-orig-calories="{{ '%.0f'|format(macros.get('calories_kcal', 0)) }}">{{ "%.0f"|format(macros.get("calories_kcal", 0)) }}</span>
+            <span class="font-sans text-sm font-medium text-stone-500">kcal</span>
           </p>
         </div>
         <div class="flex items-center gap-1.5 text-xs text-stone-500">
           <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
           <span>Verified IFCT Data</span>
         </div>
+      </div>
+
+      <!-- Visual Primary Macro Progress Strip -->
+      {% set p_g = macros.get("protein_g", 0) or 0 %}
+      {% set c_g = macros.get("carbohydrates_g", 0) or 0 %}
+      {% set f_g = macros.get("total_fat_g", 0) or 0 %}
+      {% set fib_g = macros.get("dietary_fiber_g", 0) or 0 %}
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+        {% for m_key, m_label, m_val, m_goal, m_color in [
+          ("protein_g", "Protein", p_g, 60.0, "bg-[#245c43]"),
+          ("carbohydrates_g", "Carbs", c_g, 250.0, "bg-amber-500"),
+          ("total_fat_g", "Total Fat", f_g, 65.0, "bg-orange-500"),
+          ("dietary_fiber_g", "Fiber", fib_g, 30.0, "bg-sky-600")
+        ] %}
+          {% set m_pct = [((m_val / m_goal) * 100)|round|int, 100]|min %}
+          <div class="rounded-xl bg-stone-50/80 border border-stone-200/80 p-2.5">
+            <div class="flex items-center justify-between text-[11px] mb-1">
+              <span class="font-bold text-stone-600">{{ m_label }}</span>
+              <strong data-turn-hero-macro="{{ m_key }}" class="font-bold text-[#173c2c]">{{ "%.1f"|format(m_val) }}g</strong>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-stone-200 overflow-hidden">
+              <div data-turn-macro-bar="{{ m_key }}" data-macro-goal="{{ m_goal }}" class="h-full rounded-full {{ m_color }} transition-all duration-200" style="width: {{ m_pct }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
       </div>
 
       <h3 class="mb-3 text-xs font-bold uppercase tracking-wide text-stone-700">Total Macronutrients</h3>
@@ -100,7 +160,7 @@
         ] %}
           <div class="flex justify-between items-center gap-2 border-b border-stone-100 py-1.5 text-xs">
             <span class="text-stone-500">{{ label }}</span>
-            <strong class="whitespace-nowrap font-bold text-stone-900">{{ "%.1f"|format(macros.get(key) or 0) }} {{ unit }}</strong>
+            <strong data-turn-macro-val="{{ key }}" data-turn-macro-unit="{{ unit }}" class="whitespace-nowrap font-bold text-stone-900">{{ "%.1f"|format(macros.get(key) or 0) }} {{ unit }}</strong>
           </div>
         {% endfor %}
       </div>
@@ -127,28 +187,52 @@
       </div>
     </div>
 
-    <!-- Ingredients Disclosure -->
-    <details class="group mb-3 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xs transition">
+    <!-- Ingredients and Identified Portions Section with In-Place Customizer -->
+    <details open id="ingredients-details-{{ msg_id }}" class="group mb-3 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xs transition">
       <summary class="flex cursor-pointer items-center justify-between px-4 py-3 text-xs font-bold text-stone-800 hover:bg-stone-50 transition list-none">
-        <span class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
           <span>Ingredients and Identified Portions</span>
           <span class="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600 font-semibold">{{ (analysis.get("items") or [])|length }} items</span>
-        </span>
-        <svg class="h-4 w-4 text-stone-400 transition transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+          {% if result.is_customized %}
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-[10px] font-bold text-[#173c2c]" title="Customized for your household kitchen">
+              ✓ Household Recipe
+            </span>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Single Customize Recipe Button (Pure PyScript Event Delegation) -->
+          <button
+            type="button"
+            id="customize-recipe-btn-{{ msg_id }}"
+            class="customize-recipe-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-50 hover:bg-amber-100/90 text-amber-900 border border-amber-200 shadow-2xs transition cursor-pointer"
+            data-toggle-recipe-mode="{{ msg_id }}"
+            data-msg-id="{{ msg_id }}"
+            title="Customize recipe ingredients & quantities for your household"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Customize Recipe</span>
+          </button>
+          <svg class="h-4 w-4 text-stone-400 transition transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
       </summary>
-      <div class="border-t border-stone-100 px-4 py-3 space-y-2.5">
+
+      <!-- Read-Only View of Ingredients: Name, Description and Weight on the Same Line -->
+      <div id="ingredients-static-{{ msg_id }}" class="border-t border-stone-100 px-4 py-3 space-y-2">
         {% for item in analysis.get("items") or [] %}
-          <div class="flex items-center justify-between gap-3 border-b border-stone-100 pb-2 text-xs">
-            <div class="min-w-0 flex-1">
-              <span class="block truncate font-bold text-stone-800">{{ item.food_name }}</span>
-              <span class="block text-[11px] text-stone-500">{{ item.serving_size_description }}</span>
+          <div class="flex items-center justify-between gap-3 border-b border-stone-100 py-1.5 text-xs">
+            <div class="min-w-0 flex-1 flex items-center gap-2">
+              <span class="font-bold text-stone-800 truncate">{{ item.food_name }}</span>
+              {% if item.serving_size_description %}
+                <span class="text-[11px] text-stone-500 truncate">({{ item.serving_size_description }})</span>
+              {% endif %}
               {% if not item.found_in_database %}
-                <span class="mt-0.5 inline-flex rounded bg-amber-50 px-1.5 py-0.2 text-[9px] font-semibold text-amber-800 border border-amber-200">Not in reference database</span>
+                <span class="inline-flex rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 border border-amber-200">Not in DB</span>
               {% endif %}
             </div>
-            <strong class="whitespace-nowrap font-bold text-stone-700">{{ "%.0f"|format(item.estimated_weight_grams) }} g</strong>
+            <strong class="whitespace-nowrap font-bold text-stone-700 flex-none">{{ "%.0f"|format(item.estimated_weight_grams) }} g</strong>
           </div>
         {% endfor %}
+
         {% for warning in result.dietary_warnings or [] %}
           <p class="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 leading-relaxed">{{ warning }}</p>
         {% endfor %}
@@ -158,6 +242,222 @@
         {% for insight in analysis.health_insights or [] %}
           <p class="rounded-lg bg-sky-50 border border-sky-200 p-2.5 text-xs text-sky-900 leading-relaxed">{{ insight }}</p>
         {% endfor %}
+      </div>
+
+      <!-- Editable In-Place Form View: Name & Weight on the Same Line + Real-Time Macro Recalculation -->
+      <div id="ingredients-form-{{ msg_id }}" class="border-t border-stone-100 bg-emerald-50/30 p-4 sm:p-5 hidden">
+        <div class="mb-3.5 flex items-start justify-between gap-3">
+          <div>
+            <h4 class="flex items-center gap-1.5 text-sm font-bold text-[#173c2c] m-0">
+              <span>🍳 Personalize Household Recipe</span>
+            </h4>
+            <p class="mt-1 text-xs text-stone-600 leading-relaxed m-0">
+              Adjust ingredient weights or swap ingredients below. <strong>Macros recalculate locally in real time</strong> as you edit, and saving persists your custom recipe to the database.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="cancel-recipe-mode-btn h-7 w-7 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition cursor-pointer flex-none"
+            data-cancel-recipe-mode="{{ msg_id }}"
+            title="Cancel customization"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Live Client-Side Macro Recalculation Preview Banner -->
+        <div id="live-recipe-preview-{{ msg_id }}" class="mb-3.5 rounded-xl border border-emerald-300 bg-white p-3 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-[#173c2c]">Real-Time Macro Totals:</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="px-2.5 py-1 rounded-lg bg-[#173c2c] text-white font-bold"><strong data-live-cal>{{ "%.0f"|format(macros.get("calories_kcal", 0)) }}</strong> kcal</span>
+            <span class="px-2 py-1 rounded-lg bg-emerald-50 text-[#173c2c] font-bold border border-emerald-200">P: <strong data-live-prot>{{ "%.1f"|format(macros.get("protein_g", 0)) }}</strong>g</span>
+            <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-900 font-bold border border-amber-200">C: <strong data-live-carb>{{ "%.1f"|format(macros.get("carbohydrates_g", 0)) }}</strong>g</span>
+            <span class="px-2 py-1 rounded-lg bg-orange-50 text-orange-900 font-bold border border-orange-200">F: <strong data-live-fat>{{ "%.1f"|format(macros.get("total_fat_g", 0)) }}</strong>g</span>
+            <span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-900 font-bold border border-sky-200">Fiber: <strong data-live-fib>{{ "%.1f"|format(macros.get("dietary_fiber_g", 0)) }}</strong>g</span>
+          </div>
+        </div>
+
+        <!-- Quick Household Ingredient Additions -->
+        <div class="mb-3 flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] font-bold text-stone-500 mr-1">Quick Add:</span>
+          <button type="button" class="quick-add-ingredient-btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:border-emerald-600 hover:text-[#173c2c] transition shadow-2xs cursor-pointer" data-target-msg="{{ msg_id }}" data-ing-name="Ghee" data-ing-weight="15" data-ing-desc="1 tbsp">
+            + Ghee (15g)
+          </button>
+          <button type="button" class="quick-add-ingredient-btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:border-emerald-600 hover:text-[#173c2c] transition shadow-2xs cursor-pointer" data-target-msg="{{ msg_id }}" data-ing-name="Coconut oil" data-ing-weight="15" data-ing-desc="1 tbsp">
+            + Coconut oil (15g)
+          </button>
+          <button type="button" class="quick-add-ingredient-btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:border-emerald-600 hover:text-[#173c2c] transition shadow-2xs cursor-pointer" data-target-msg="{{ msg_id }}" data-ing-name="Mustard oil" data-ing-weight="15" data-ing-desc="1 tbsp">
+            + Mustard oil (15g)
+          </button>
+          <button type="button" class="quick-add-ingredient-btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:border-emerald-600 hover:text-[#173c2c] transition shadow-2xs cursor-pointer" data-target-msg="{{ msg_id }}" data-ing-name="Peanuts" data-ing-weight="20" data-ing-desc="2 tbsp">
+            + Peanuts (20g)
+          </button>
+          <button type="button" class="quick-add-ingredient-btn inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:border-emerald-600 hover:text-[#173c2c] transition shadow-2xs cursor-pointer" data-target-msg="{{ msg_id }}" data-ing-name="Curry leaves" data-ing-weight="5" data-ing-desc="1 sprig">
+            + Curry leaves (5g)
+          </button>
+        </div>
+
+        <form
+          id="recipe-form-{{ msg_id }}"
+          method="post"
+          action="/chats/customize-recipe"
+          class="recipe-customize-form space-y-3.5"
+          data-recipe-form-msg="{{ msg_id }}"
+          data-conversation-id="{{ conversation_id or '' }}"
+        >
+          <input type="hidden" name="conversation_id" value="{{ conversation_id or '' }}">
+          <input type="hidden" name="message_id" value="{{ msg_id }}">
+          <input type="hidden" name="ingredients_json" id="ingredients-json-{{ msg_id }}" value="">
+
+          <!-- Personalized Dish Title & Description Section -->
+          <div class="rounded-xl border border-stone-200 bg-white p-3 sm:p-4 shadow-2xs space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-1 border-b border-stone-100 pb-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-[#173c2c] flex items-center gap-1.5">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Dish Title &amp; Description</span>
+              </span>
+              {% if (result.ai_dish_name or result.original_dish_name) and (result.ai_dish_name or result.original_dish_name) != (analysis.meal_title or '') %}
+                <span class="text-[10px] text-stone-400">
+                  AI suggested: <span class="italic text-stone-600 font-medium">{{ result.ai_dish_name or result.original_dish_name }}</span>
+                </span>
+              {% endif %}
+            </div>
+
+            <div>
+              <label for="dish-name-{{ msg_id }}" class="block text-[11px] font-bold text-stone-700 mb-1">Dish Name / Title</label>
+              <input
+                type="text"
+                id="dish-name-{{ msg_id }}"
+                name="dish_name"
+                class="dish-name-input form-input text-xs font-bold text-stone-900 !py-1.5 !px-2.5 border-stone-200 rounded-lg w-full focus:border-emerald-600 focus:ring-emerald-600"
+                placeholder="e.g. Avalakki, Poha, Dal Khichdi"
+                value="{{ analysis.meal_title or 'Customized Meal' }}"
+                required
+              >
+            </div>
+
+            <div>
+              <label for="dish-desc-{{ msg_id }}" class="block text-[11px] font-bold text-stone-700 mb-1">Dish Description / Summary</label>
+              <textarea
+                id="dish-desc-{{ msg_id }}"
+                name="dish_description"
+                rows="2"
+                class="dish-desc-input form-textarea text-xs text-stone-700 !py-1.5 !px-2.5 border-stone-200 rounded-lg w-full leading-relaxed focus:border-emerald-600 focus:ring-emerald-600"
+                placeholder="e.g. Home-made Avalakki with roasted peanuts and less oil"
+              >{{ analysis.recognized_input_summary or '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-stone-200 bg-white overflow-x-auto shadow-2xs">
+            <div class="min-w-[480px]">
+              <div class="bg-stone-50 px-3 py-2 border-b border-stone-200 flex flex-nowrap items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                <span class="flex-1 min-w-[140px]">Ingredient Name</span>
+                <span class="w-28 sm:w-36 flex-none">Portion / Notes</span>
+                <span class="w-24 flex-none text-right pr-3">Weight (g)</span>
+                <span class="w-8 flex-none text-center">Del</span>
+              </div>
+
+              <div id="ingredient-rows-{{ msg_id }}" class="divide-y divide-stone-100 p-1 space-y-1">
+                {% for item in analysis.get("items") or [] %}
+                  <div
+                    class="ingredient-row flex flex-nowrap items-center gap-2 p-1.5 rounded-lg hover:bg-stone-50/80 transition"
+                    data-ingredient-row
+                    data-orig-name="{{ item.food_name }}"
+                    data-orig-weight="{{ item.estimated_weight_grams or 50 }}"
+                    data-item-macros='{{ (item.macronutrients or {}) | tojson }}'
+                  >
+                    <div class="flex-1 min-w-[140px]">
+                      <input
+                        type="text"
+                        class="ing-name-input form-input text-xs font-semibold text-stone-800 !py-1.5 !px-2.5 border-stone-200 rounded-lg w-full"
+                        placeholder="e.g. Rice flakes, Coconut oil, Ghee"
+                        value="{{ item.food_name }}"
+                        required
+                      >
+                    </div>
+                    <div class="w-28 sm:w-36 flex-none">
+                      <input
+                        type="text"
+                        class="ing-desc-input form-input text-xs text-stone-600 !py-1.5 !px-2 border-stone-200 rounded-lg w-full"
+                        placeholder="e.g. 1 tbsp, 1 cup"
+                        value="{{ item.serving_size_description or '' }}"
+                      >
+                    </div>
+                    <div class="w-24 flex-none flex items-center justify-end gap-1">
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="5000"
+                        class="ing-weight-input form-input text-xs font-bold text-stone-900 !py-1.5 !px-2 w-16 text-right border-stone-200 rounded-lg"
+                        value="{{ '%.0f'|format(item.estimated_weight_grams or 50) }}"
+                        required
+                      >
+                      <span class="text-[11px] font-medium text-stone-500">g</span>
+                    </div>
+                    <div class="w-8 flex-none flex justify-center">
+                      <button
+                        type="button"
+                        class="delete-ingredient-row-btn h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition cursor-pointer"
+                        data-ingredient-name="{{ item.food_name }}"
+                        title="Remove ingredient"
+                        aria-label="Remove ingredient"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="border-t border-stone-100 bg-stone-50/50 p-2">
+              <button
+                type="button"
+                class="add-ingredient-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-emerald-600/40 text-xs font-bold text-[#173c2c] hover:bg-emerald-50 hover:border-emerald-600 transition cursor-pointer w-full justify-center"
+                data-add-ingredient-btn="{{ msg_id }}"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ Add Another Ingredient</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <div class="flex items-center gap-2">
+              <button
+                type="submit"
+                class="save-recipe-btn inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#245c43] hover:bg-[#173c2c] text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                data-save-recipe="{{ msg_id }}"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Save &amp; Recalculate Nutrition</span>
+              </button>
+              <button
+                type="button"
+                class="cancel-recipe-mode-btn px-3.5 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition cursor-pointer"
+                data-cancel-recipe-mode="{{ msg_id }}"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {% if result.is_customized %}
+              <button
+                type="button"
+                class="reset-recipe-btn inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-500 hover:text-red-700 hover:bg-red-50 hover:border-red-200 transition cursor-pointer"
+                data-reset-recipe="{{ msg_id }}"
+                data-conversation-id="{{ conversation_id or '' }}"
+                title="Revert back to the baseline AI detected recipe"
+              >
+                ↺ Reset to Original AI Recipe
+              </button>
+            {% endif %}
+          </div>
+        </form>
       </div>
     </details>
     <p class="text-[10px] text-stone-400 leading-relaxed">Nutrient values are estimates scaled from reference food data using portion estimates.</p>

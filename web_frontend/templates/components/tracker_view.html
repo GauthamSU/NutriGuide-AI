@@ -1,380 +1,588 @@
-<main data-page="tracker" class="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 bg-[#f5f6f1]">
-  {% set daily = tracker_summary.periods.daily if tracker_summary and tracker_summary.periods and tracker_summary.periods.daily else {} %}
-  {% set macros = daily.macronutrients if daily and daily.macronutrients else {} %}
-  {% set micros = daily.micronutrients if daily and daily.micronutrients else {'vitamins': [], 'minerals': []} %}
-  {% set meals = daily.meals if daily and daily.meals else [] %}
+<!-- Personal Nutrient Tracker View -->
+<main id="tracker-view" class="page-scroll min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8" data-page="tracker">
+  <div class="mx-auto max-w-6xl space-y-6">
 
-  <div class="mx-auto w-full max-w-[1240px] space-y-6 pb-16">
-    <!-- Header & Period Selector Tabs -->
+    <!-- Top Header & Period Switcher -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-stone-200/80 pb-5">
-      <div class="min-w-0 flex-1">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold tracking-wider uppercase border border-emerald-200 mb-1.5">Dietary Diary</span>
-        <h1 class="font-serif m-0 text-2xl sm:text-3xl font-bold text-[#173c2c] tracking-tight">Nutrition Tracker</h1>
-        <p class="mt-1 max-w-[680px] text-xs sm:text-sm leading-relaxed text-stone-600">
-          Only meals you explicitly ask to log or click <strong class="text-stone-800">“Log to Tracker”</strong> on appear here. Switch between periods to inspect your complete verified macronutrients, vitamins, and minerals.
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold uppercase tracking-wider text-[#245c43] mb-2">
+          <span class="h-1.5 w-1.5 rounded-full bg-[#245c43]"></span>
+          Personal Diet Diary
+        </span>
+        <h1 class="font-serif text-3xl sm:text-4xl font-bold text-[#173c2c] tracking-tight m-0">Nutrient Tracker</h1>
+        <p class="mt-1 text-xs sm:text-sm text-stone-600 max-w-2xl">
+          Monitor your daily, weekly, and monthly macronutrient &amp; micronutrient progress with collapsible daily logs.
         </p>
       </div>
 
-      <!-- Segmented Radio Tabs (Daily / Weekly / Monthly) -->
-      <div class="inline-flex p-1 rounded-xl bg-stone-200/80 border border-stone-200 text-xs font-semibold" role="tablist" aria-label="Tracker aggregation period">
-        <button type="button" role="tab" aria-selected="true" class="segmented-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer text-[#173c2c] font-bold bg-white shadow-2xs" data-tracker-tab="daily">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
-          <span>Daily</span>
-        </button>
-        <button type="button" role="tab" aria-selected="false" class="segmented-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer text-stone-600 hover:text-stone-900" data-tracker-tab="weekly">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span>Weekly</span>
-        </button>
-        <button type="button" role="tab" aria-selected="false" class="segmented-tab flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition cursor-pointer text-stone-600 hover:text-stone-900" data-tracker-tab="monthly">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10H3"/><path d="M16 2v4"/><path d="M8 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
-          <span>Monthly</span>
+      <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+        <!-- High-Contrast Period Segmented Tabs: Daily / Weekly / Monthly -->
+        <div class="inline-flex rounded-xl bg-stone-100 p-1 border border-stone-200/90 shadow-2xs" role="tablist" aria-label="Tracker time period">
+          <button
+            type="button"
+            id="tracker-tab-daily"
+            data-tracker-tab="daily"
+            role="tab"
+            aria-selected="true"
+            class="tracker-period-tab is-active rounded-lg px-4 py-2 text-xs font-bold bg-[#173c2c] text-white shadow-xs transition-all cursor-pointer"
+          >
+            Daily
+          </button>
+          <button
+            type="button"
+            id="tracker-tab-weekly"
+            data-tracker-tab="weekly"
+            role="tab"
+            aria-selected="false"
+            class="tracker-period-tab rounded-lg px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-white/70 transition-all cursor-pointer"
+          >
+            Weekly
+          </button>
+          <button
+            type="button"
+            id="tracker-tab-monthly"
+            data-tracker-tab="monthly"
+            role="tab"
+            aria-selected="false"
+            class="tracker-period-tab rounded-lg px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-white/70 transition-all cursor-pointer"
+          >
+            Monthly
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="open-manual-tracker-trigger inline-flex items-center gap-2 rounded-xl bg-[#245c43] hover:bg-[#173c2c] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Log Custom Meal</span>
         </button>
       </div>
     </div>
 
-    <div id="tracker-feedback" class="hidden rounded-xl p-3.5 text-xs font-medium" role="status"></div>
+    {% set summary = tracker_summary or {} %}
+    {% set macros = summary.get("total_macronutrients") or {} %}
+    {% set micronutrients = summary.get("total_micronutrients") or {} %}
+    {% set meals = summary.get("meals") or [] %}
 
-    <!-- Quick Status Bar -->
-    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white border border-stone-200/90 p-4 shadow-xs">
-      <div class="flex flex-wrap items-center gap-2">
-        <span id="tracker-period-badge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">{{ daily.label or "Today (Last 24 Hours)" }}</span>
-        <span id="tracker-meals-count-badge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">{{ daily.meals_count or 0 }} {{ "meal" if (daily.meals_count or 0) == 1 else "meals" }} logged</span>
-        <span id="tracker-daily-avg-badge" class="text-xs font-semibold text-stone-600 px-1">
-          Avg: <strong class="text-[#173c2c]">{{ (daily.daily_average_calories_kcal or 0)|round|int }} kcal / day</strong>
+    <!-- Period Context Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white border border-stone-200 px-4 py-2.5 shadow-2xs">
+      <div class="flex items-center gap-2">
+        <span id="tracker-period-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-100 text-[#173c2c] text-xs font-bold">
+          Today's Intake (Daily View)
+        </span>
+        <span id="tracker-period-subtext" class="text-xs text-stone-500">
+          Showing meals &amp; cumulative targets for today
         </span>
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" id="open-manual-tracker-modal-btn" class="open-manual-tracker-trigger px-3.5 py-2 text-xs font-semibold text-stone-700 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl transition cursor-pointer">
-          + Log Custom Meal
-        </button>
-        <a href="/" hx-get="/" hx-select="main[data-conversation-id]" hx-target="#chat-view" hx-swap="innerHTML" hx-push-url="/" hx-indicator="#chat-loading" class="px-4 py-2 text-xs font-bold text-white bg-[#245c43] hover:bg-[#173c2c] rounded-xl shadow-xs transition cursor-pointer">
-          Analyze Dish in Chat →
-        </a>
+      <div class="flex items-center gap-2 text-xs text-stone-600 font-medium">
+        <span>Logged Meals: <strong id="tracker-meals-count" class="text-[#173c2c] font-bold">{{ summary.get("meals_count", meals|length) }}</strong></span>
       </div>
     </div>
 
-    <!-- Hero Cards: Calories & Main Macros -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-      <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white p-4 shadow-xs">
-        <span class="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">Total Energy</span>
-        <strong id="tracker-hero-calories" class="font-serif block text-2xl sm:text-3xl font-bold text-[#173c2c] mt-1">{{ (macros.calories_kcal or 0)|round|int }} <small class="text-xs font-sans text-stone-500 font-normal">kcal</small></strong>
-        <span id="tracker-hero-calories-sub" class="block text-[11px] text-stone-500 mt-1">Across {{ daily.meals_count or 0 }} logged meals</span>
-      </div>
-      <div class="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
-        <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-500">Protein</span>
-        <strong id="tracker-hero-protein" class="font-serif block text-2xl font-bold text-[#173c2c] mt-1">{{ "%.1f"|format(macros.protein_g or 0) }} <small class="text-xs font-sans text-stone-500 font-normal">g</small></strong>
-        <span class="block text-[11px] text-stone-500 mt-1">Muscle &amp; tissue repair</span>
-      </div>
-      <div class="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
-        <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-500">Carbohydrates</span>
-        <strong id="tracker-hero-carbs" class="font-serif block text-2xl font-bold text-[#173c2c] mt-1">{{ "%.1f"|format(macros.carbohydrates_g or 0) }} <small class="text-xs font-sans text-stone-500 font-normal">g</small></strong>
-        <span id="tracker-hero-carbs-sub" class="block text-[11px] text-stone-500 mt-1">Sugars: {{ "%.1f"|format(macros.total_sugars_g or 0) }}g</span>
-      </div>
-      <div class="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs">
-        <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Fat</span>
-        <strong id="tracker-hero-fat" class="font-serif block text-2xl font-bold text-[#173c2c] mt-1">{{ "%.1f"|format(macros.total_fat_g or 0) }} <small class="text-xs font-sans text-stone-500 font-normal">g</small></strong>
-        <span id="tracker-hero-sat-chol" class="block text-[11px] text-stone-500 mt-1 truncate">Sat: {{ "%.1f"|format(macros.saturated_fat_g or 0) }}g</span>
-      </div>
-      <div class="rounded-2xl border border-stone-200 bg-white p-4 shadow-xs col-span-2 sm:col-span-1">
-        <span class="block text-[10px] font-bold uppercase tracking-wider text-stone-500">Dietary Fiber</span>
-        <strong id="tracker-hero-fiber" class="font-serif block text-2xl font-bold text-[#173c2c] mt-1">{{ "%.1f"|format(macros.dietary_fiber_g or 0) }} <small class="text-xs font-sans text-stone-500 font-normal">g</small></strong>
-        <span id="tracker-hero-fiber-sub" class="block text-[11px] text-stone-500 mt-1">Digestive wellness</span>
-      </div>
-    </div>
+    <!-- Hero Macro Summary Cards with Visual Progress Bars -->
+    {% set cal_val = macros.get("calories_kcal", 0) or 0 %}
+    {% set prot_val = macros.get("protein_g", 0) or 0 %}
+    {% set carb_val = macros.get("carbohydrates_g", 0) or 0 %}
+    {% set fat_val = macros.get("total_fat_g", 0) or 0 %}
+    {% set fib_val = macros.get("dietary_fiber_g", 0) or 0 %}
 
-    <!-- Complete Nutrient Breakdown (Macronutrients / Vitamins / Minerals) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-      <!-- 14 Macronutrients/Proximates -->
-      <section class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col">
-        <div class="mb-3 flex items-center justify-between border-b border-stone-100 pb-3">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-400">Proximates &amp; Lipids</p>
-            <h2 class="font-serif text-lg font-bold text-[#173c2c] m-0">Macronutrients (14)</h2>
-          </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Complete</span>
-        </div>
-        <dl id="tracker-macros-list" class="m-0 divide-y divide-stone-100 text-xs">
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Calories (Energy)</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="calories_kcal" data-macro-unit="kcal">{{ "%.1f"|format(macros.calories_kcal or 0) }} kcal</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Protein</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="protein_g" data-macro-unit="g">{{ "%.2f"|format(macros.protein_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Total Carbohydrates</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="carbohydrates_g" data-macro-unit="g">{{ "%.2f"|format(macros.carbohydrates_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Dietary Fiber</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="dietary_fiber_g" data-macro-unit="g">{{ "%.2f"|format(macros.dietary_fiber_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Total Sugars</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="total_sugars_g" data-macro-unit="g">{{ "%.2f"|format(macros.total_sugars_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Added Sugars</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="added_sugars_g" data-macro-unit="g">{{ "%.2f"|format(macros.added_sugars_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Total Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="total_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.total_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Saturated Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="saturated_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.saturated_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Monounsaturated Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="monounsaturated_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.monounsaturated_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Polyunsaturated Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="polyunsaturated_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.polyunsaturated_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Total Unsaturated Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="unsaturated_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.unsaturated_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Trans Fat</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="trans_fat_g" data-macro-unit="g">{{ "%.2f"|format(macros.trans_fat_g or 0) }} g</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Cholesterol</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="cholesterol_mg" data-macro-unit="mg">{{ "%.1f"|format(macros.cholesterol_mg or 0) }} mg</dd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <dt class="font-medium text-stone-600">Water / Moisture</dt>
-            <dd class="m-0 font-bold text-stone-900" data-macro-key="water_g" data-macro-unit="g">{{ "%.1f"|format(macros.water_g or 0) }} g</dd>
-          </div>
-        </dl>
-      </section>
+    {% set cal_pct = [((cal_val / 2000.0) * 100)|round|int, 100]|min %}
+    {% set prot_pct = [((prot_val / 60.0) * 100)|round|int, 100]|min %}
+    {% set carb_pct = [((carb_val / 250.0) * 100)|round|int, 100]|min %}
+    {% set fat_pct = [((fat_val / 65.0) * 100)|round|int, 100]|min %}
+    {% set fib_pct = [((fib_val / 30.0) * 100)|round|int, 100]|min %}
 
-      <!-- Vitamins -->
-      <section class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col">
-        <div class="mb-3 flex items-center justify-between border-b border-stone-100 pb-3">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-400">Micronutrients</p>
-            <h2 class="font-serif text-lg font-bold text-[#173c2c] m-0">Vitamins</h2>
-          </div>
-          <span id="tracker-vitamins-count" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">{{ (micros.vitamins or [])|length }} tracked</span>
-        </div>
-        <div id="tracker-vitamins-list" class="divide-y divide-stone-100 text-xs max-h-[460px] overflow-y-auto pr-1">
-          {% if micros.vitamins %}
-            {% for v in micros.vitamins %}
-              <div class="flex items-center justify-between py-2">
-                <span class="font-medium text-stone-600">{{ v.name }}</span>
-                <strong class="text-stone-900">{{ v.amount }} {{ v.unit }}</strong>
-              </div>
-            {% endfor %}
-          {% else %}
-            <p class="m-0 rounded-xl border border-dashed border-stone-200 p-5 text-center text-xs text-stone-500">
-              No vitamin data recorded for this period yet.
-            </p>
-          {% endif %}
-        </div>
-      </section>
-
-      <!-- Minerals -->
-      <section class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs flex flex-col">
-        <div class="mb-3 flex items-center justify-between border-b border-stone-100 pb-3">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-stone-400">Electrolytes &amp; Minerals</p>
-            <h2 class="font-serif text-lg font-bold text-[#173c2c] m-0">Minerals</h2>
-          </div>
-          <span id="tracker-minerals-count" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">{{ (micros.minerals or [])|length }} tracked</span>
-        </div>
-        <div id="tracker-minerals-list" class="divide-y divide-stone-100 text-xs max-h-[460px] overflow-y-auto pr-1">
-          {% if micros.minerals %}
-            {% for m in micros.minerals %}
-              <div class="flex items-center justify-between py-2">
-                <span class="font-medium text-stone-600">{{ m.name }}</span>
-                <strong class="text-stone-900">{{ m.amount }} {{ m.unit }}</strong>
-              </div>
-            {% endfor %}
-          {% else %}
-            <p class="m-0 rounded-xl border border-dashed border-stone-200 p-5 text-center text-xs text-stone-500">
-              No mineral data recorded for this period yet.
-            </p>
-          {% endif %}
-        </div>
-      </section>
-    </div>
-
-    <!-- Logged Meals History List -->
-    <section class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <!-- Calories Hero Card -->
+      <div class="rounded-2xl bg-[#173c2c] text-white p-4 sm:p-5 shadow-xs flex flex-col justify-between border border-[#173c2c]">
         <div>
-          <p class="text-[10px] font-bold uppercase tracking-wider text-stone-400">Meal History</p>
-          <h2 class="font-serif text-xl sm:text-2xl font-bold text-[#173c2c] m-0">Tracked Meals in Selected Period</h2>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-200/90">Total Calories</span>
+            <span id="tracker-pct-calories" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-800/80 text-emerald-100">{{ cal_pct }}%</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1.5">
+            <strong id="tracker-stat-calories" class="font-serif text-3xl font-bold leading-none">{{ "%.0f"|format(cal_val) }}</strong>
+            <span class="text-xs text-emerald-100/80 font-medium">kcal</span>
+          </div>
         </div>
-        <span id="tracker-meals-section-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">{{ meals|length }} {{ "entry" if meals|length == 1 else "entries" }}</span>
+        <div class="mt-3.5">
+          <div class="h-2 w-full rounded-full bg-emerald-950/80 overflow-hidden">
+            <div id="tracker-bar-calories" class="h-full rounded-full bg-emerald-400 transition-all duration-300" style="width: {{ cal_pct }}%"></div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-emerald-200/90">
+            <span id="tracker-target-calories">Goal: 2,000 kcal</span>
+            <span>Energy</span>
+          </div>
+        </div>
       </div>
 
-      <div id="tracker-meals-list" class="space-y-3">
-        {% if meals %}
-          {% for item in meals %}
-            {% set item_macros = item.macronutrients if item.macronutrients else {} %}
-            <article class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-stone-200/80 bg-stone-50/50 hover:bg-white hover:border-emerald-300 hover:shadow-xs transition" data-tracked-meal-row="{{ item.id }}">
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  {% if item.conversation_id and item.source_message_id %}
-                    <a href="/chats/{{ item.conversation_id }}#turn-{{ item.source_message_id }}"
-                       hx-get="/chats/{{ item.conversation_id }}"
-                       hx-select="main[data-conversation-id]"
-                       hx-target="#chat-view"
-                       hx-swap="innerHTML"
-                       hx-push-url="/chats/{{ item.conversation_id }}#turn-{{ item.source_message_id }}"
-                       class="text-sm font-bold text-[#173c2c] hover:underline"
-                       title="Go to this meal in Chat">
-                      <span>{{ item.meal_title }}</span>
-                    </a>
-                  {% else %}
-                    <strong class="text-sm font-bold text-[#173c2c]">{{ item.meal_title }}</strong>
-                  {% endif %}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">{{ item.meal_type or "Meal" }}</span>
-                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-200">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span>{{ item.consumed_display or item.consumed_time or "Recorded" }}</span>
-                  </span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800">
-                    {% if item.logged_via in ['explicit_chat', 'text_intent', 'voice_intent'] %}Chat Intent{% elif item.logged_via in ['chat_button', 'button'] %}Chat Button{% else %}Manual Entry{% endif %}
-                  </span>
+      <!-- Protein Card -->
+      <div class="rounded-2xl bg-white border border-stone-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Protein</span>
+            <span id="tracker-pct-protein" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">{{ prot_pct }}%</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <strong id="tracker-stat-protein" class="font-serif text-2xl sm:text-3xl font-bold text-[#173c2c] leading-none">{{ "%.1f"|format(prot_val) }}</strong>
+            <span class="text-xs font-semibold text-stone-400">g</span>
+          </div>
+        </div>
+        <div class="mt-3.5">
+          <div class="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+            <div id="tracker-bar-protein" class="h-full rounded-full bg-[#245c43] transition-all duration-300" style="width: {{ prot_pct }}%"></div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-stone-500">
+            <span id="tracker-target-protein">Goal: 60g</span>
+            <span class="text-emerald-700 font-semibold">Muscle</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carbohydrates Card -->
+      <div class="rounded-2xl bg-white border border-stone-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Carbohydrates</span>
+            <span id="tracker-pct-carbs" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200">{{ carb_pct }}%</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <strong id="tracker-stat-carbs" class="font-serif text-2xl sm:text-3xl font-bold text-[#173c2c] leading-none">{{ "%.1f"|format(carb_val) }}</strong>
+            <span class="text-xs font-semibold text-stone-400">g</span>
+          </div>
+        </div>
+        <div class="mt-3.5">
+          <div class="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+            <div id="tracker-bar-carbs" class="h-full rounded-full bg-amber-500 transition-all duration-300" style="width: {{ carb_pct }}%"></div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-stone-500">
+            <span id="tracker-target-carbs">Goal: 250g</span>
+            <span class="text-amber-700 font-semibold">Fuel</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Fat Card -->
+      <div class="rounded-2xl bg-white border border-stone-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Total Fat</span>
+            <span id="tracker-pct-fat" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-900 border border-orange-200">{{ fat_pct }}%</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <strong id="tracker-stat-fat" class="font-serif text-2xl sm:text-3xl font-bold text-[#173c2c] leading-none">{{ "%.1f"|format(fat_val) }}</strong>
+            <span class="text-xs font-semibold text-stone-400">g</span>
+          </div>
+        </div>
+        <div class="mt-3.5">
+          <div class="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+            <div id="tracker-bar-fat" class="h-full rounded-full bg-orange-500 transition-all duration-300" style="width: {{ fat_pct }}%"></div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-stone-500">
+            <span id="tracker-target-fat">Goal: 65g</span>
+            <span class="text-orange-700 font-semibold">Lipids</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dietary Fiber Card -->
+      <div class="rounded-2xl bg-white border border-stone-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-stone-500">Dietary Fiber</span>
+            <span id="tracker-pct-fiber" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-900 border border-sky-200">{{ fib_pct }}%</span>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <strong id="tracker-stat-fiber" class="font-serif text-2xl sm:text-3xl font-bold text-[#173c2c] leading-none">{{ "%.1f"|format(fib_val) }}</strong>
+            <span class="text-xs font-semibold text-stone-400">g</span>
+          </div>
+        </div>
+        <div class="mt-3.5">
+          <div class="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+            <div id="tracker-bar-fiber" class="h-full rounded-full bg-sky-600 transition-all duration-300" style="width: {{ fib_pct }}%"></div>
+          </div>
+          <div class="mt-1.5 flex items-center justify-between text-[11px] text-stone-500">
+            <span id="tracker-target-fiber">Goal: 30g</span>
+            <span class="text-sky-700 font-semibold">Gut Health</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Complete Nutrient Breakdown (Collapsible Details for Clean Scanability) -->
+    <details class="group rounded-2xl border border-stone-200 bg-white shadow-2xs overflow-hidden">
+      <summary class="flex cursor-pointer items-center justify-between px-5 py-4 hover:bg-stone-50/80 transition list-none">
+        <div class="flex items-center gap-2.5">
+          <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[#245c43] border border-emerald-200">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+          </span>
+          <div>
+            <h2 class="text-sm font-bold text-stone-800 m-0">Detailed Macronutrient &amp; Micronutrient Breakdown</h2>
+            <p class="text-[11px] text-stone-500 m-0">14 macronutrients with progress bars + IFCT 2017 vitamins &amp; minerals</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-[#245c43] group-open:hidden">Expand Breakdown</span>
+          <span class="text-xs font-semibold text-stone-500 hidden group-open:inline">Hide Breakdown</span>
+          <svg class="h-4 w-4 text-stone-400 transition transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </summary>
+
+      <div class="border-t border-stone-100 p-5 sm:p-6 space-y-5">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-stone-700 m-0">All 14 Macronutrients</h3>
+            <span class="inline-flex items-center gap-1.5 text-[11px] text-stone-500">
+              <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+              Verified IFCT &amp; USDA Data
+            </span>
+          </div>
+
+          <div id="tracker-macronutrients-grid" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {% for key, label, unit, daily_goal, bar_color in [
+              ("protein_g", "Protein", "g", 60, "bg-[#245c43]"),
+              ("carbohydrates_g", "Carbohydrates", "g", 250, "bg-amber-500"),
+              ("dietary_fiber_g", "Dietary fiber", "g", 30, "bg-sky-600"),
+              ("total_sugars_g", "Total sugars", "g", 50, "bg-amber-400"),
+              ("added_sugars_g", "Added sugars", "g", 25, "bg-rose-500"),
+              ("total_fat_g", "Total fat", "g", 65, "bg-orange-500"),
+              ("saturated_fat_g", "Saturated fat", "g", 20, "bg-orange-600"),
+              ("monounsaturated_fat_g", "Monounsaturated fat", "g", 25, "bg-emerald-500"),
+              ("polyunsaturated_fat_g", "Polyunsaturated fat", "g", 15, "bg-teal-500"),
+              ("unsaturated_fat_g", "Total unsaturated fat", "g", 40, "bg-emerald-600"),
+              ("trans_fat_g", "Trans fat", "g", 2, "bg-red-500"),
+              ("cholesterol_mg", "Cholesterol", "mg", 300, "bg-amber-600"),
+              ("sodium_mg", "Sodium", "mg", 2000, "bg-indigo-500"),
+              ("water_g", "Water", "g", 2500, "bg-sky-500")
+            ] %}
+              {% set val = macros.get(key) or 0 %}
+              {% set pct = [((val / daily_goal) * 100)|round|int, 100]|min if daily_goal > 0 else 0 %}
+              <div class="rounded-xl border border-stone-200/80 bg-stone-50/40 p-3">
+                <div class="flex justify-between items-center gap-2 text-xs mb-1.5">
+                  <span class="font-medium text-stone-600">{{ label }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <strong data-macro-key="{{ key }}" data-macro-unit="{{ unit }}" data-macro-goal="{{ daily_goal }}" class="whitespace-nowrap font-bold text-stone-900">{{ "%.1f"|format(val) }} {{ unit }}</strong>
+                    <span data-macro-pct="{{ key }}" class="text-[10px] font-semibold text-stone-400">({{ pct }}%)</span>
+                  </div>
                 </div>
-                <p class="m-0 mt-2 text-xs text-stone-600">
-                  <strong class="text-stone-900">{{ (item_macros.calories_kcal or 0)|round|int }} kcal</strong> ·
-                  Protein: <strong>{{ "%.1f"|format(item_macros.protein_g or 0) }}g</strong> ·
-                  Carbs: <strong>{{ "%.1f"|format(item_macros.carbohydrates_g or 0) }}g</strong> ·
-                  Fat: <strong>{{ "%.1f"|format(item_macros.total_fat_g or 0) }}g</strong> ·
-                  Fiber: <strong>{{ "%.1f"|format(item_macros.dietary_fiber_g or 0) }}g</strong>
-                </p>
+                <div class="h-1.5 w-full rounded-full bg-stone-200/80 overflow-hidden">
+                  <div data-macro-bar="{{ key }}" class="h-full rounded-full {{ bar_color }} transition-all duration-300" style="width: {{ pct }}%"></div>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                {% if item.conversation_id and item.source_message_id %}
-                  <a href="/chats/{{ item.conversation_id }}#turn-{{ item.source_message_id }}"
-                     hx-get="/chats/{{ item.conversation_id }}"
-                     hx-select="main[data-conversation-id]"
-                     hx-target="#chat-view"
-                     hx-swap="innerHTML"
-                     hx-push-url="/chats/{{ item.conversation_id }}#turn-{{ item.source_message_id }}"
-                     class="tracker-chat-link h-8 px-2.5 rounded-lg inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 border border-stone-200 transition cursor-pointer"
-                     title="Jump to the original chat turn">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span>View in Chat</span>
-                  </a>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="border-t border-stone-100 pt-4">
+          <h3 class="mb-2 text-xs font-bold uppercase tracking-wider text-stone-700">Total Micronutrients (Vitamins &amp; Minerals)</h3>
+          <div id="tracker-micronutrients-container">
+            {% for category, label in [("vitamins", "Vitamins"), ("minerals", "Minerals")] %}
+              {% set nutrients = micronutrients.get(category) or [] %}
+              <h4 class="mb-2 mt-3 text-[10px] font-bold uppercase tracking-wider text-stone-500">{{ label }}</h4>
+              {% if nutrients %}
+                <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                  {% for nutrient in nutrients %}
+                    <div class="flex justify-between items-center gap-2 border-b border-stone-100 py-1.5 text-xs">
+                      <span class="text-stone-600 truncate" title="{{ nutrient.name }}">{{ nutrient.name }}</span>
+                      <strong class="whitespace-nowrap font-semibold text-stone-900">{{ "%.2f"|format(nutrient.amount) }} {{ nutrient.unit }}</strong>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="text-xs text-stone-400 italic">No {{ label|lower }} logged for this period yet.</p>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Collapsible Daily Meal Logs Section -->
+    <div class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-4 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-[#173c2c] m-0">Tracked Meal Logs</h2>
+          <p class="text-xs text-stone-500 mt-0.5 m-0">Organized into collapsible daily logs for fast scanability. Click any day to expand or collapse.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            id="tracker-expand-all-btn"
+            class="px-2.5 py-1 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-[11px] font-semibold text-stone-600 transition cursor-pointer"
+          >
+            Expand / Collapse All
+          </button>
+        </div>
+      </div>
+
+      <div id="tracker-meals-list" class="space-y-4">
+        {% if meals %}
+          {% for meal in meals %}
+            <article class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-stone-200/90 bg-white p-4 hover:border-emerald-300 transition shadow-2xs" data-tracked-meal-id="{{ meal.id }}">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#245c43] border border-emerald-200">
+                    {{ meal.meal_category or meal.meal_type or "Meal" }}
+                  </span>
+                  <span class="text-[11px] font-medium text-stone-400">
+                    {{ meal.consumed_at_display or (meal.consumed_at[:16]|replace("T", " ") if meal.consumed_at else "Today") }}
+                  </span>
+                  {% if meal.conversation_id %}
+                    <a
+                      href="/"
+                      data-open-chat-id="{{ meal.conversation_id }}"
+                      hx-post="/chats/open"
+                      hx-vals='{"conversation_id": "{{ meal.conversation_id }}"}'
+                      hx-target="#chat-view"
+                      hx-select="main"
+                      hx-swap="innerHTML"
+                      hx-push-url="/"
+                      class="inline-flex items-center gap-1 text-[11px] font-bold text-[#245c43] hover:underline"
+                    >
+                      <span>View in Chat ↗</span>
+                    </a>
+                  {% endif %}
+                </div>
+                <h4 class="font-bold text-stone-900 text-sm truncate m-0">{{ meal.meal_title }}</h4>
+                {% if meal.serving_notes %}
+                  <p class="text-xs text-stone-500 mt-0.5 line-clamp-1 m-0">{{ meal.serving_notes }}</p>
                 {% endif %}
+              </div>
+
+              {% set m_macs = meal.get('macronutrients') if meal.get is defined else (meal.macronutrients or {}) %}
+              {% set m_cal = (meal.calories_kcal if meal.calories_kcal is defined and meal.calories_kcal else 0) or (m_macs.get('calories_kcal') if m_macs.get is defined else (m_macs.calories_kcal or 0)) or 0 %}
+              {% set m_prot = (meal.protein_g if meal.protein_g is defined and meal.protein_g else 0) or (m_macs.get('protein_g') if m_macs.get is defined else (m_macs.protein_g or 0)) or 0 %}
+              {% set m_carb = (meal.carbohydrates_g if meal.carbohydrates_g is defined and meal.carbohydrates_g else 0) or (m_macs.get('carbohydrates_g') if m_macs.get is defined else (m_macs.carbohydrates_g or 0)) or 0 %}
+              {% set m_fat = (meal.total_fat_g if meal.total_fat_g is defined and meal.total_fat_g else 0) or (m_macs.get('total_fat_g') if m_macs.get is defined else (m_macs.total_fat_g or 0)) or 0 %}
+              {% set m_fiber = (meal.dietary_fiber_g if meal.dietary_fiber_g is defined and meal.dietary_fiber_g else 0) or (m_macs.get('dietary_fiber_g') if m_macs.get is defined else (m_macs.dietary_fiber_g or 0)) or 0 %}
+
+              <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-[#173c2c] font-bold border border-emerald-200">{{ "%.0f"|format(m_cal or 0) }} kcal</span>
+                  <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">P: {{ "%.1f"|format(m_prot or 0) }}g</span>
+                  <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">C: {{ "%.1f"|format(m_carb or 0) }}g</span>
+                  <span class="px-2 py-1 rounded-lg bg-stone-100 text-stone-700 font-semibold">F: {{ "%.1f"|format(m_fat or 0) }}g</span>
+                </div>
                 <button
                   type="button"
-                  data-delete-tracked-meal-id="{{ item.id }}"
-                  class="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-red-700 hover:bg-red-50 border border-stone-200 hover:border-red-200 transition cursor-pointer"
-                  title="Remove this meal from your tracker"
+                  data-share-meal-to-group
+                  data-meal-title="{{ meal.meal_title }}"
+                  data-meal-category="{{ meal.meal_category or meal.meal_type or 'Lunch' }}"
+                  data-calories="{{ '%.0f'|format(m_cal or 0) }}"
+                  data-protein="{{ '%.1f'|format(m_prot or 0) }}"
+                  data-carbs="{{ '%.1f'|format(m_carb or 0) }}"
+                  data-fat="{{ '%.1f'|format(m_fat or 0) }}"
+                  data-fiber="{{ '%.1f'|format(m_fiber or 0) }}"
+                  class="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-[#173c2c] text-[11px] font-bold transition cursor-pointer inline-flex items-center gap-1"
+                  title="Share this meal to a Nutrition Group"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  <span>Delete</span>
+                  <span>⇄ Share to Group</span>
+                </button>
+                <button
+                  type="button"
+                  data-delete-tracked-meal-id="{{ meal.id }}"
+                  class="h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                  title="Remove meal from tracker"
+                  aria-label="Remove meal from tracker"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
               </div>
             </article>
           {% endfor %}
         {% else %}
-          <div class="rounded-xl border border-dashed border-stone-200 p-8 text-center">
-            <p class="font-serif m-0 text-xl font-bold text-[#173c2c]">No meals logged in this period yet</p>
-            <p class="mx-auto mt-1.5 max-w-[520px] text-xs leading-relaxed text-stone-500">
-              To log a meal, say <em>“Log this meal to my tracker”</em> in chat or click the <strong>“Log to Tracker”</strong> button next to any analyzed dish.
+          <!-- Engaging Empty State -->
+          <div class="rounded-2xl border border-dashed border-stone-300 bg-stone-50/60 p-8 sm:p-10 text-center">
+            <div class="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100/80 text-[#173c2c] border border-emerald-200 shadow-2xs">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <h3 class="font-serif text-xl font-bold text-[#173c2c] m-0">Your Nutrition Diary is Ready</h3>
+            <p class="mx-auto mt-1.5 max-w-md text-xs sm:text-sm text-stone-600 leading-relaxed">
+              No meals logged for this period yet. Snap a photo or describe your meal in Chat for AI IFCT analysis, or log a custom dish directly below.
             </p>
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                class="open-manual-tracker-trigger inline-flex items-center gap-2 rounded-xl bg-[#245c43] hover:bg-[#173c2c] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+              >
+                <span>+ Log Custom Meal</span>
+              </button>
+              <a
+                href="/"
+                hx-get="/"
+                hx-target="#chat-view"
+                hx-select="main"
+                hx-swap="innerHTML"
+                hx-push-url="/"
+                class="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 px-4 py-2.5 text-xs font-bold text-[#173c2c] shadow-2xs transition cursor-pointer"
+              >
+                <span>Analyze a Meal in Chat →</span>
+              </a>
+            </div>
           </div>
         {% endif %}
       </div>
-    </section>
+    </div>
+
+    <!-- Embedded JSON state for instant client-side period switching -->
+    <script id="tracker-initial-json" type="application/json">{{ summary | tojson }}</script>
   </div>
 
-  <!-- Modal: Manual Log Custom Meal to Tracker -->
-  <div id="manual-tracker-modal" class="fixed inset-0 z-[95] flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="manual-tracker-modal-title">
+  <!-- Modal 1: Log Custom Meal to Tracker (with Share to Group Option) -->
+  <div id="manual-tracker-modal" class="fixed inset-0 z-[90] flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="manual-tracker-modal-title">
     <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-stone-200/90 max-h-[92vh] overflow-y-auto">
       <div class="flex items-start justify-between gap-3 border-b border-stone-100 pb-3.5">
         <div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold tracking-wide uppercase border border-emerald-200 mb-1">Manual Entry</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold tracking-wide uppercase border border-emerald-200 mb-1">Custom Entry</span>
           <h2 id="manual-tracker-modal-title" class="font-serif text-2xl font-bold text-[#173c2c] m-0">Log a Meal to Tracker</h2>
         </div>
         <button type="button" data-close-modal="manual-tracker-modal" class="h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition cursor-pointer" aria-label="Close modal">✕</button>
       </div>
 
-      <form id="manual-tracker-form" class="mt-4 space-y-4">
-        <input type="hidden" name="owner_id" value="{{ owner_id }}">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label for="tracker-meal-title" class="block text-xs font-bold text-stone-800 mb-1">Meal / Dish Name <span class="text-red-500">*</span></label>
-            <input id="tracker-meal-title" name="meal_title" type="text" required placeholder="e.g., Quinoa Bowl" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 focus:border-[#245c43]">
-          </div>
-          <div>
-            <label for="tracker-meal-type" class="block text-xs font-bold text-stone-800 mb-1">Meal Category</label>
-            <select id="tracker-meal-type" name="meal_type" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 focus:border-[#245c43]">
-              <option value="Breakfast">Breakfast</option>
-              <option value="Lunch">Lunch</option>
-              <option value="Snacks">Snacks</option>
-              <option value="Dinner">Dinner</option>
-              <option value="Meal" selected>General Meal</option>
-            </select>
+      <form id="manual-tracker-form" method="post" action="/tracker/log" class="mt-4 space-y-4">
+        <div>
+          <label for="manual-meal-title" class="block text-xs font-bold text-stone-800 mb-1">Meal / Dish Description <span class="text-red-500">*</span></label>
+          <input id="manual-meal-title" name="meal_title" type="text" required placeholder="e.g. 2 Ragi Dosa with Peanut Chutney &amp; Sambar" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50/50 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 focus:border-[#245c43] transition">
+          <p class="mt-1 text-[11px] text-stone-500">Leave nutrient fields blank to auto-calculate from the IFCT food database.</p>
+        </div>
+
+        <!-- Meal Category: Breakfast / Lunch / Snacks / Dinner -->
+        <div>
+          <p class="text-xs font-bold text-stone-800 mb-2">Meal Category</p>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <label class="modal-cat-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:text-emerald-900">
+              <input type="radio" name="meal_category" value="breakfast" class="sr-only">
+              <span class="text-xs font-semibold">Breakfast</span>
+            </label>
+            <label class="modal-cat-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:text-emerald-900">
+              <input type="radio" name="meal_category" value="lunch" checked class="sr-only">
+              <span class="text-xs font-semibold">Lunch</span>
+            </label>
+            <label class="modal-cat-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:text-emerald-900">
+              <input type="radio" name="meal_category" value="snacks" class="sr-only">
+              <span class="text-xs font-semibold">Snacks</span>
+            </label>
+            <label class="modal-cat-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:text-emerald-900">
+              <input type="radio" name="meal_category" value="dinner" class="sr-only">
+              <span class="text-xs font-semibold">Dinner</span>
+            </label>
           </div>
         </div>
 
+        <!-- Time option: Now or Custom -->
         <div>
-          <label class="block text-xs font-bold text-stone-800 mb-1.5">Consumption Time</label>
-          <div class="grid grid-cols-2 gap-3 mb-2">
-            <label class="flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600">
+          <p class="text-xs font-bold text-stone-800 mb-1.5">When did you have this meal?</p>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <label class="modal-time-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600">
               <input type="radio" name="time_option" value="now" checked class="sr-only">
-              <span class="font-bold text-xs text-stone-900">Right Now</span>
+              <span class="text-xs font-bold text-stone-800">Right Now</span>
             </label>
-            <label class="flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600">
+            <label class="modal-time-card flex items-center justify-center p-2.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600">
               <input type="radio" name="time_option" value="custom" class="sr-only">
-              <span class="font-bold text-xs text-stone-900">Custom Time</span>
+              <span class="text-xs font-bold text-stone-800">Custom Date &amp; Time</span>
             </label>
           </div>
           <div id="manual-custom-time-container" class="hidden">
-            <input id="manual-tracker-consumed-at" name="consumed_at" type="datetime-local" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-stone-50/50">
+            <input id="manual-custom-datetime" name="consumed_at" type="datetime-local" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-stone-50/50">
           </div>
         </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <!-- Optional Macros Override -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
           <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Calories (kcal)</label>
-            <input name="calories_kcal" type="number" step="0.1" min="0" required placeholder="450" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
+            <label class="block text-[10px] font-bold text-stone-500 uppercase mb-1">Calories</label>
+            <input name="calories_kcal" type="number" step="any" placeholder="Auto" class="w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Protein (g)</label>
-            <input name="protein_g" type="number" step="0.1" min="0" placeholder="28" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
+            <label class="block text-[10px] font-bold text-stone-500 uppercase mb-1">Protein (g)</label>
+            <input name="protein_g" type="number" step="any" placeholder="Auto" class="w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Carbs (g)</label>
-            <input name="carbohydrates_g" type="number" step="0.1" min="0" placeholder="42" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
+            <label class="block text-[10px] font-bold text-stone-500 uppercase mb-1">Carbs (g)</label>
+            <input name="carbohydrates_g" type="number" step="any" placeholder="Auto" class="w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Total Fat (g)</label>
-            <input name="total_fat_g" type="number" step="0.1" min="0" placeholder="16" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
+            <label class="block text-[10px] font-bold text-stone-500 uppercase mb-1">Fat (g)</label>
+            <input name="total_fat_g" type="number" step="any" placeholder="Auto" class="w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs">
           </div>
           <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Dietary Fiber (g)</label>
-            <input name="dietary_fiber_g" type="number" step="0.1" min="0" placeholder="7" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
+            <label class="block text-[10px] font-bold text-stone-500 uppercase mb-1">Fiber (g)</label>
+            <input name="dietary_fiber_g" type="number" step="any" placeholder="Auto" class="w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs">
           </div>
-          <div>
-            <label class="block text-[11px] font-bold text-stone-700 mb-1">Total Sugars (g)</label>
-            <input name="total_sugars_g" type="number" step="0.1" min="0" placeholder="5" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs">
-          </div>
+        </div>
+
+        <!-- Seamless Share to Group Option -->
+        <div class="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5">
+          <label for="manual-share-group-select" class="block text-xs font-bold text-[#173c2c] mb-1">
+            ⇄ Also Share to Nutrition Group (Optional)
+          </label>
+          <select id="manual-share-group-select" name="share_group_id" class="w-full px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-medium text-stone-800 focus:outline-none focus:border-[#245c43]">
+            <option value="">Personal Diary Only (Do not share)</option>
+            {% for grp in my_groups or [] %}
+              <option value="{{ grp.id }}">Share with {{ grp.name }} ({{ grp.member_count or 1 }} members)</option>
+            {% endfor %}
+          </select>
+          <p class="mt-1 text-[10px] text-stone-500 m-0">Automatically posts this meal to the selected group's collective leaderboard and feed.</p>
         </div>
 
         <div id="manual-tracker-feedback" class="hidden rounded-xl p-3 text-xs"></div>
 
         <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-100">
           <button type="button" data-close-modal="manual-tracker-modal" class="px-4 py-2 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer">Cancel</button>
-          <button type="submit" id="manual-tracker-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-[#245c43] hover:bg-[#173c2c] rounded-xl shadow-xs transition cursor-pointer">Log Meal to Tracker →</button>
+          <button type="submit" id="manual-tracker-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-[#245c43] hover:bg-[#173c2c] rounded-xl shadow-xs transition cursor-pointer">Save to Diary</button>
         </div>
       </form>
     </div>
   </div>
 
-  <script id="initial-tracker-data" type="application/json">
-    {{ (tracker_summary or {})|tojson }}
-  </script>
+  <!-- Modal 2: Quick Share Existing Tracked Meal to Group -->
+  <div id="share-to-group-modal" class="fixed inset-0 z-[95] flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="share-group-modal-title">
+    <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-stone-200/90">
+      <div class="flex items-start justify-between gap-3 border-b border-stone-100 pb-3.5">
+        <div>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold tracking-wide uppercase border border-emerald-200 mb-1">Community Share</span>
+          <h2 id="share-group-modal-title" class="font-serif text-xl font-bold text-[#173c2c] m-0">Share Meal to Group</h2>
+        </div>
+        <button type="button" data-close-modal="share-to-group-modal" class="h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition cursor-pointer" aria-label="Close modal">✕</button>
+      </div>
+
+      <form id="share-tracked-meal-form" method="post" action="/groups/meals" class="mt-4 space-y-4">
+        <input type="hidden" id="share-modal-meal-title" name="meal_title" value="">
+        <input type="hidden" id="share-modal-meal-category" name="meal_type" value="Lunch">
+        <input type="hidden" id="share-modal-calories" name="calories_kcal" value="0">
+        <input type="hidden" id="share-modal-protein" name="protein_g" value="0">
+        <input type="hidden" id="share-modal-carbs" name="carbohydrates_g" value="0">
+        <input type="hidden" id="share-modal-fat" name="total_fat_g" value="0">
+        <input type="hidden" id="share-modal-fiber" name="dietary_fiber_g" value="0">
+
+        <div class="rounded-xl bg-stone-50 border border-stone-200 p-3.5">
+          <p id="share-modal-meal-display" class="text-sm font-bold text-[#173c2c] m-0">Selected Meal</p>
+          <p id="share-modal-macros-display" class="text-xs text-stone-600 mt-1 m-0"></p>
+        </div>
+
+        <div>
+          <label for="share-modal-group-select" class="block text-xs font-bold text-stone-800 mb-1.5">Choose Nutrition Group <span class="text-red-500">*</span></label>
+          <select id="share-modal-group-select" name="group_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-white text-xs font-semibold text-stone-800 focus:outline-none focus:border-[#245c43]">
+            {% if my_groups %}
+              {% for grp in my_groups %}
+                <option value="{{ grp.id }}">{{ grp.name }} ({{ grp.member_count or 1 }} members)</option>
+              {% endfor %}
+            {% else %}
+              <option value="">No joined groups yet — join or create a group first</option>
+            {% endif %}
+          </select>
+        </div>
+
+        <div id="share-modal-feedback" class="hidden rounded-xl p-3 text-xs"></div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-100">
+          <button type="button" data-close-modal="share-to-group-modal" class="px-4 py-2 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer">Cancel</button>
+          <button type="submit" id="share-modal-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-[#245c43] hover:bg-[#173c2c] rounded-xl shadow-xs transition cursor-pointer">Share to Group →</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script id="initial-tracker-data" type="application/json">{{ tracker_summary | tojson }}</script>
 </main>

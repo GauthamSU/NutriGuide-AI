@@ -9,7 +9,7 @@
       <button type="button" data-close-modal="log-to-tracker-modal" class="h-8 w-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition cursor-pointer" aria-label="Close modal">✕</button>
     </div>
 
-    <form id="log-to-tracker-form" class="mt-4 space-y-4">
+    <form id="log-to-tracker-form" method="post" action="/tracker/log" class="mt-4 space-y-4">
       <input type="hidden" id="log-modal-conversation-id" name="conversation_id" value="">
       <input type="hidden" id="log-modal-message-id" name="message_id" value="">
 
@@ -65,6 +65,20 @@
         <div id="log-modal-custom-time-container" class="hidden">
           <input id="log-modal-custom-datetime" name="consumed_at" type="datetime-local" class="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-stone-50/50">
         </div>
+      </div>
+
+      <!-- Seamless Share to Group Option -->
+      <div class="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5">
+        <label for="log-modal-share-group-select" class="block text-xs font-bold text-[#173c2c] mb-1">
+          ⇄ Also Share to Nutrition Group (Optional)
+        </label>
+        <select id="log-modal-share-group-select" name="share_group_id" class="w-full px-3 py-2 rounded-xl border border-stone-200 bg-white text-xs font-medium text-stone-800 focus:outline-none focus:border-[#245c43]">
+          <option value="">Personal Diary Only (Do not share)</option>
+          {% for grp in my_groups or [] %}
+            <option value="{{ grp.id }}">Share with {{ grp.name }} ({{ grp.member_count or 1 }} members)</option>
+          {% endfor %}
+        </select>
+        <p class="mt-1 text-[10px] text-stone-500 m-0">Automatically shares this dish to the selected group's collective leaderboard and feed.</p>
       </div>
 
       <div id="log-modal-feedback" class="hidden rounded-xl p-3 text-xs"></div>

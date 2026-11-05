@@ -46,10 +46,11 @@
           </button>
         </div>
 
-        <p id="auth-feedback" class="hidden mb-4 rounded-xl border p-3.5 text-xs font-medium" role="alert"></p>
+        <p id="auth-feedback" class="{% if not auth_error %}hidden {% endif %}mb-4 rounded-xl border p-3.5 text-xs font-medium {% if auth_error %}border-red-200 bg-red-50 text-red-700{% endif %}" role="alert">{{ auth_error or "" }}</p>
 
         <!-- Login Form -->
-        <form id="login-form" data-auth-panel-login class="{% if initial_tab != 'login' %}hidden{% endif %}" data-auth-panel="login" novalidate>
+        <form id="login-form" method="post" action="/auth/login" data-auth-panel-login class="{% if initial_tab != 'login' %}hidden{% endif %}" data-auth-panel="login" novalidate>
+          <p id="login-feedback" class="hidden mb-4 rounded-xl border p-3.5 text-xs font-medium" role="alert"></p>
           <div class="mb-4">
             <label for="login-username" class="block text-xs font-bold text-stone-700 mb-1.5">Username or Email</label>
             <input id="login-username" name="identifier" type="text" required autocomplete="username" placeholder="e.g. aarav_sharma or aarav@example.com" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">
@@ -68,8 +69,8 @@
         </form>
 
         <!-- Signup Form with Interactive Password Strength UI -->
-        <form id="signup-form" data-auth-panel-signup class="{% if initial_tab != 'signup' %}hidden{% endif %}" data-auth-panel="signup" novalidate>
-          <input type="hidden" name="owner_id" value="{{ owner_id }}">
+        <form id="signup-form" method="post" action="/auth/signup" data-auth-panel-signup class="{% if initial_tab != 'signup' %}hidden{% endif %}" data-auth-panel="signup" novalidate>
+          <p id="signup-feedback" class="hidden mb-4 rounded-xl border p-3.5 text-xs font-medium" role="alert"></p>
           <div class="mb-4">
             <label for="signup-username" class="block text-xs font-bold text-stone-700 mb-1.5">Username <span class="text-[#c65a42]">*</span></label>
             <input id="signup-username" name="username" type="text" required minlength="3" maxlength="150" autocomplete="username" placeholder="Choose a unique username (e.g. priya_nutri)" class="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:bg-white focus:border-[#245c43] focus:outline-none focus:ring-2 focus:ring-[#245c43]/20 transition-all">

@@ -7,8 +7,26 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase, override_settings
 
-from chat_history.models import ChatConversation, ChatMessage, MealPlanHistory
-from chat_history.services import get_conversation, list_conversations, save_chat_message, save_meal_plan, list_meal_plans
+from chat_history.models import (
+    ChatConversation,
+    ChatMessage,
+    GroupMealLog,
+    MealPlanHistory,
+    NutritionGroup,
+    TrackedMeal,
+    UserCustomRecipe,
+)
+from chat_history.services import (
+    customize_dish_recipe,
+    delete_chat_message,
+    delete_conversation,
+    get_conversation,
+    list_conversations,
+    list_meal_plans,
+    reset_dish_recipe,
+    save_chat_message,
+    save_meal_plan,
+)
 from nutrition.services.llama_client import LlamaCppClient
 
 
@@ -190,6 +208,92 @@ class ChatHistoryTests(TestCase):
         self.assertEqual(len(conversations.json()), 1)
         self.assertEqual(conversations.json()[0]["id"], self.conversation_id)
 
+    def test_delete_single_message_deletes_conversation_and_cascades_tracker(self):
+        """Deleting the only message in a conversation deletes the conversation and cascades to TrackedMeal."""
+        self.save_message()
+        msg = ChatMessage.objects.using("default").get()
+        conv_id = str(msg.conversation_id)
+        msg_id = str(msg.id)
+
+        # Log a meal linked to this chat message turn
+        tracked = TrackedMeal.objects.create(
+            owner_id=self.owner_id,
+            conversation_id=conv_id,
+            source_message_id=msg_id,
+            meal_title="Lentil soup",
+            macronutrients={"calories_kcal": 300},
+        )
+        # Update message with tracker log id
+        msg.ai_response = {"dish_name": "Lentil soup", "tracker_log_id": str(tracked.id)}
+        msg.save(using="default", update_fields=["ai_response"])
+
+        self.assertEqual(TrackedMeal.objects.filter(id=tracked.id).count(), 1)
+        self.assertEqual(ChatConversation.objects.filter(id=conv_id).count(), 1)
+
+        result = delete_chat_message(self.owner_id, conv_id, msg_id)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["remaining_messages"], 0)
+        self.assertTrue(result["conversation_deleted"])
+
+        # Conversation should be deleted
+        self.assertEqual(ChatConversation.objects.filter(id=conv_id).count(), 0)
+        # Message should be deleted
+        self.assertEqual(ChatMessage.objects.filter(id=msg_id).count(), 0)
+        # TrackedMeal should be cascaded and deleted
+        self.assertEqual(TrackedMeal.objects.filter(id=tracked.id).count(), 0)
+
+    def test_delete_message_with_multiple_messages_only_deletes_turn_and_cascades_meal(self):
+        """Deleting one message in a multi-turn conversation deletes only that turn and its tracked meal."""
+        self.save_message()
+        msg1 = ChatMessage.objects.using("default").get()
+        conv = msg1.conversation
+
+        # Add second message to same conversation
+        msg2 = ChatMessage.objects.using("default").create(
+            conversation=conv,
+            user_query="Second dish query",
+            ai_response={"meal_title": "Second Dish", "tracker_log_id": ""},
+        )
+
+        tracked1 = TrackedMeal.objects.create(
+            owner_id=self.owner_id,
+            conversation_id=str(conv.id),
+            source_message_id=str(msg1.id),
+            meal_title="Lentil soup",
+        )
+        msg1.ai_response = {"dish_name": "Lentil soup", "tracker_log_id": str(tracked1.id)}
+        msg1.save(using="default", update_fields=["ai_response"])
+
+        result = delete_chat_message(self.owner_id, str(conv.id), str(msg1.id))
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["remaining_messages"], 1)
+        self.assertFalse(result["conversation_deleted"])
+
+        # Conversation still exists with msg2
+        self.assertEqual(ChatConversation.objects.filter(id=conv.id).count(), 1)
+        self.assertEqual(ChatMessage.objects.filter(id=msg1.id).count(), 0)
+        self.assertEqual(ChatMessage.objects.filter(id=msg2.id).count(), 1)
+        # Tracked meal for msg1 is cascaded and deleted
+        self.assertEqual(TrackedMeal.objects.filter(id=tracked1.id).count(), 0)
+
+    def test_delete_conversation_cascades_all_tracked_meals_and_group_logs(self):
+        """Deleting a conversation deletes all associated TrackedMeals and GroupMealLogs."""
+        self.save_message()
+        msg = ChatMessage.objects.using("default").get()
+        conv = msg.conversation
+
+        tracked = TrackedMeal.objects.create(
+            owner_id=self.owner_id,
+            conversation_id=str(conv.id),
+            source_message_id=str(msg.id),
+            meal_title="Lentil soup",
+        )
+
+        result = delete_conversation(self.owner_id, str(conv.id))
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(ChatConversation.objects.filter(id=conv.id).count(), 0)
+        self.assertEqual(TrackedMeal.objects.filter(id=tracked.id).count(), 0)
+
 
 class ModelAudioTranscriptionTests(TestCase):
     def test_uses_the_configured_model_and_returns_its_transcript(self):
@@ -348,3 +452,234 @@ class ChatHistoryAdminTests(TestCase):
         changelist = self.client.get("/admin/chat_history/chatconversation/")
         self.assertEqual(changelist.status_code, 200)
         self.assertContains(changelist, conversation.title)
+
+
+class UserCustomRecipeTests(TestCase):
+    databases = {"default", "nutrition"}
+
+    @classmethod
+    def setUpTestData(cls):
+        from nutrition.models import Food, FoodGroup, ProximateNutrient
+        from backend.food_database.services import clear_food_lookup_cache
+
+        clear_food_lookup_cache()
+        grp_a, _ = FoodGroup.objects.get_or_create(code="A", defaults={"name": "Cereals and Millets"})
+        grp_t, _ = FoodGroup.objects.get_or_create(code="T", defaults={"name": "Edible Oils and Fats"})
+        grp_h, _ = FoodGroup.objects.get_or_create(code="H", defaults={"name": "Nuts and Oilseeds"})
+
+        f_poha, _ = Food.objects.get_or_create(food_code="A011", defaults={"group": grp_a, "name": "Rice flakes"})
+        ProximateNutrient.objects.get_or_create(
+            food=f_poha, defaults={"energy_kcal": 346.0, "protein_g": 6.6, "carbohydrates_g": 77.3, "total_fat_g": 1.2, "total_fiber_g": 2.8}
+        )
+
+        f_coconut_oil, _ = Food.objects.get_or_create(food_code="T001", defaults={"group": grp_t, "name": "Coconut oil"})
+        ProximateNutrient.objects.get_or_create(
+            food=f_coconut_oil, defaults={"energy_kcal": 900.0, "protein_g": 0.0, "carbohydrates_g": 0.0, "total_fat_g": 100.0, "total_fiber_g": 0.0}
+        )
+
+        f_peanuts, _ = Food.objects.get_or_create(food_code="H012", defaults={"group": grp_h, "name": "Ground nut"})
+        ProximateNutrient.objects.get_or_create(
+            food=f_peanuts, defaults={"energy_kcal": 567.0, "protein_g": 25.8, "carbohydrates_g": 16.1, "total_fat_g": 49.2, "total_fiber_g": 8.5}
+        )
+
+        f_ghee, _ = Food.objects.get_or_create(food_code="T013", defaults={"group": grp_t, "name": "Ghee"})
+        ProximateNutrient.objects.get_or_create(
+            food=f_ghee, defaults={"energy_kcal": 900.0, "protein_g": 0.0, "carbohydrates_g": 0.0, "total_fat_g": 100.0, "total_fiber_g": 0.0}
+        )
+
+        f_rava, _ = Food.objects.get_or_create(food_code="A022", defaults={"group": grp_a, "name": "Semolina"})
+        ProximateNutrient.objects.get_or_create(
+            food=f_rava, defaults={"energy_kcal": 360.0, "protein_g": 12.0, "carbohydrates_g": 72.8, "total_fat_g": 1.0, "total_fiber_g": 3.9}
+        )
+
+    def setUp(self):
+        from backend.food_database.services import clear_food_lookup_cache
+        clear_food_lookup_cache()
+        self.owner_id = str(uuid.uuid4())
+        self.conversation_id = str(uuid.uuid4())
+
+    def _create_message(self, dish_name="Avalakki", logged_to_tracker=False):
+        return save_chat_message(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            user_query=f"I had {dish_name} for breakfast",
+            transcription="",
+            modalities=["text"],
+            ai_response={
+                "dish_name": dish_name,
+                "recognized_input_summary": f"A bowl of {dish_name}",
+                "ingredients": [
+                    {
+                        "ingredient_name": "Rice flakes",
+                        "serving_size_description": "1 bowl",
+                        "estimated_weight_grams": 100,
+                        "confidence": 0.95,
+                    },
+                    {
+                        "ingredient_name": "Mustard oil",
+                        "serving_size_description": "1 tsp",
+                        "estimated_weight_grams": 5,
+                        "confidence": 0.95,
+                    },
+                ],
+                "dietary_tags": ["Vegetarian"],
+                "health_insights": ["Classic breakfast dish."],
+            },
+            logged_to_tracker=logged_to_tracker,
+        )
+
+    def test_customize_dish_recipe_creates_db_record_and_recalculates(self):
+        msg = self._create_message("Avalakki")
+        msg_id = str(msg.id)
+
+        # Household uses Coconut oil (15g) instead of mustard oil, and added Peanuts (20g)
+        custom_ingredients = [
+            {"food_name": "Rice flakes", "estimated_weight_grams": 120, "serving_size_description": "1.2 cups"},
+            {"food_name": "Coconut oil", "estimated_weight_grams": 15, "serving_size_description": "1 tbsp"},
+            {"food_name": "Peanuts", "estimated_weight_grams": 20, "serving_size_description": "2 tbsp"},
+        ]
+
+        result = customize_dish_recipe(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            message_id=msg_id,
+            customized_ingredients=custom_ingredients,
+            dish_name="Mom's Special Avalakki",
+            description="Traditional coastal Avalakki with roasted peanuts and coconut oil",
+            notes="South Indian household recipe using coconut oil",
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["is_customized"])
+        self.assertEqual(result["dish_name"], "Mom's Special Avalakki")
+        self.assertEqual(result["description"], "Traditional coastal Avalakki with roasted peanuts and coconut oil")
+        self.assertEqual(result["ai_dish_name"], "Avalakki")
+        analysis = result["analysis"]
+        self.assertIn("total_macronutrients", analysis)
+        self.assertGreater(analysis["total_macronutrients"]["calories_kcal"], 0)
+
+        # Verify UserCustomRecipe was persisted in the new database table
+        saved_recipe = UserCustomRecipe.objects.using("default").filter(
+            owner_id=self.owner_id, message_id=msg_id
+        ).first()
+        self.assertIsNotNone(saved_recipe)
+        self.assertEqual(saved_recipe.dish_name, "Mom's Special Avalakki")
+        self.assertEqual(saved_recipe.description, "Traditional coastal Avalakki with roasted peanuts and coconut oil")
+        self.assertEqual(saved_recipe.ai_dish_name, "Avalakki")
+        self.assertEqual(len(saved_recipe.customized_ingredients), 3)
+        self.assertIn("coconut oil", saved_recipe.notes.lower())
+        self.assertGreater(saved_recipe.total_macronutrients.get("calories_kcal", 0), 0)
+
+        # Verify ChatMessage ai_response is updated
+        msg.refresh_from_db()
+        self.assertTrue(msg.ai_response.get("is_customized"))
+        self.assertEqual(msg.ai_response.get("dish_name"), "Mom's Special Avalakki")
+        self.assertEqual(msg.ai_response.get("recognized_input_summary"), "Traditional coastal Avalakki with roasted peanuts and coconut oil")
+        self.assertEqual(len(msg.ai_response.get("ingredients", [])), 3)
+
+    def test_customize_dish_recipe_cascades_to_tracked_meal(self):
+        msg = self._create_message("Poha", logged_to_tracker=True)
+        msg_id = str(msg.id)
+
+        # Create a linked TrackedMeal
+        tracked_meal = TrackedMeal.objects.using("default").create(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            source_message_id=msg_id,
+            meal_title="Poha",
+            macronutrients={"calories_kcal": 200, "protein_g": 5},
+            items=[],
+        )
+
+        # User swaps cooking oil to Ghee (20g)
+        custom_ingredients = [
+            {"food_name": "Rice flakes", "estimated_weight_grams": 100, "serving_size_description": "1 cup"},
+            {"food_name": "Ghee", "estimated_weight_grams": 20, "serving_size_description": "1.5 tbsp"},
+        ]
+
+        result = customize_dish_recipe(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            message_id=msg_id,
+            customized_ingredients=custom_ingredients,
+            dish_name="Poha",
+            notes="Made with pure desi ghee",
+        )
+
+        self.assertTrue(result["is_customized"])
+        tracked_meal.refresh_from_db()
+        self.assertGreater(tracked_meal.macronutrients["calories_kcal"], 200)
+        self.assertEqual(len(tracked_meal.items), 2)
+
+    def test_reset_dish_recipe_reverts_to_baseline(self):
+        msg = self._create_message("Avalakki")
+        msg_id = str(msg.id)
+
+        # Customize first
+        customize_dish_recipe(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            message_id=msg_id,
+            customized_ingredients=[{"food_name": "Ghee", "estimated_weight_grams": 30}],
+            dish_name="Custom Avalakki",
+            description="Customized avalakki recipe",
+        )
+
+        msg.refresh_from_db()
+        self.assertTrue(msg.ai_response.get("is_customized"))
+        self.assertEqual(msg.ai_response.get("dish_name"), "Custom Avalakki")
+
+        # Revert back
+        reset_res = reset_dish_recipe(
+            owner_id=self.owner_id,
+            conversation_id=self.conversation_id,
+            message_id=msg_id,
+        )
+        self.assertFalse(reset_res["is_customized"])
+        self.assertEqual(reset_res["dish_name"], "Avalakki")
+
+        msg.refresh_from_db()
+        self.assertFalse(msg.ai_response.get("is_customized"))
+        self.assertEqual(msg.ai_response.get("dish_name"), "Avalakki")
+        self.assertEqual(len(msg.ai_response.get("ingredients", [])), 2)
+
+    def test_customize_recipe_api_endpoint(self):
+        msg = self._create_message("Upma")
+        msg_id = str(msg.id)
+
+        response = self.client.post(
+            f"/api/chat-history/conversations/{self.conversation_id}/messages/{msg_id}/customize-recipe",
+            data={
+                "owner_id": self.owner_id,
+                "dish_name": "Upma",
+                "notes": "Customized upma",
+                "ingredients": [
+                    {
+                        "food_name": "Semolina",
+                        "estimated_weight_grams": 80,
+                        "serving_size_description": "1 cup",
+                    },
+                    {
+                        "food_name": "Ghee",
+                        "estimated_weight_grams": 15,
+                        "serving_size_description": "1 tbsp",
+                    },
+                ],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["is_customized"])
+        self.assertEqual(data["dish_name"], "Upma")
+        self.assertIn("analysis", data)
+        self.assertGreater(data["analysis"]["total_macronutrients"]["calories_kcal"], 0)
+
+    def test_user_custom_recipe_admin_registration(self):
+        from chat_history.admin import UserCustomRecipeAdmin
+        self.assertIn(UserCustomRecipe, admin.site._registry)
+        request = RequestFactory().get("/admin/")
+        request.user = MagicMock(is_staff=True)
+        model_admin = UserCustomRecipeAdmin(UserCustomRecipe, admin.site)
+        self.assertTrue(model_admin.has_module_permission(request))
+

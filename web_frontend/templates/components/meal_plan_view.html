@@ -1,152 +1,215 @@
 <main class="meal-plan-view min-h-0 flex-1 overflow-y-auto p-4 sm:p-8 bg-[#f5f6f1]" data-page="meal-plan">
   <div class="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
     <section class="min-w-0">
-      <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <!-- Page Header -->
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-stone-200/80 pb-5">
         <div>
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold tracking-wider uppercase border border-emerald-200 mb-1.5">AI Nutritionist</span>
-          <h1 class="font-serif mb-1 text-2xl sm:text-3xl font-bold text-[#173c2c] tracking-tight">Smart Meal Planner</h1>
-          <p class="max-w-2xl text-xs sm:text-sm leading-relaxed text-stone-600">Choose your plan duration, dietary preference, and focus goals. You can also attach food photos or speak your needs.</p>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#245c43] text-[11px] font-bold tracking-wider uppercase border border-emerald-200 mb-2">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#245c43]"></span>
+            AI Clinical Nutritionist
+          </span>
+          <h1 class="font-serif mb-1 text-3xl sm:text-4xl font-bold text-[#173c2c] tracking-tight m-0">Smart Meal Planner</h1>
+          <p class="max-w-2xl text-xs sm:text-sm leading-relaxed text-stone-600 m-0">
+            Configure your plan horizon, dietary identity, and health goals below. Explore interactive meal cards with mini macro summaries and instant dish swapping.
+          </p>
         </div>
-        <div class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 shadow-2xs" role="status" aria-live="polite">
-          <span class="h-2 w-2 rounded-full bg-[#245c43] animate-pulse" id="meal-plan-mode-dot" aria-hidden="true"></span>
+        <div class="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 shadow-2xs" role="status" aria-live="polite">
+          <span class="h-2.5 w-2.5 rounded-full bg-[#245c43] animate-pulse" id="meal-plan-mode-dot" aria-hidden="true"></span>
           <span id="meal-plan-active-mode-badge" class="text-xs font-bold text-[#173c2c]">Daily Plan · Vegetarian (Veg)</span>
         </div>
       </div>
 
-      <form id="meal-plan-form" class="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-7 shadow-xs mb-7" enctype="multipart/form-data">
-        <input type="hidden" name="owner_id" value="{{ owner_id }}">
+      <!-- Visually Distinct Multi-Card Configuration Form -->
+      <form id="meal-plan-form" method="post" action="/meal-plans/generate" class="space-y-5 mb-8" enctype="multipart/form-data">
 
-        <!-- Step 1: Duration Tabs (Daily / Weekly / Monthly) -->
-        <fieldset class="mb-6 border-0 p-0">
-          <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-700 mb-3">
-            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#245c43] text-[10px] font-bold text-white">1</span>
-            <span>Choose Plan Duration</span>
-          </legend>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Meal plan duration">
-            <label class="duration-radio-tab flex items-center gap-3 p-3.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-[#245c43] has-[:checked]:ring-1 has-[:checked]:ring-[#245c43]" data-duration-tab>
-              <input type="radio" name="duration" value="daily" checked class="sr-only">
-              <span class="h-9 w-9 rounded-lg bg-emerald-100/60 text-emerald-800 flex items-center justify-center flex-none" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14h.01"/></svg>
-              </span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Daily Plan</strong>
-                <small class="block text-[11px] text-stone-500">1-Day tailored menu</small>
-              </span>
-            </label>
+        <!-- Top 2-Column Grid: Step 1 (Duration) & Step 2 (Dietary Preference) -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <!-- Step 1 Card: Plan Duration -->
+          <fieldset class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs m-0">
+            <div class="flex items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-stone-100">
+              <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173c2c] p-0">
+                <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-[#173c2c] text-[11px] font-bold text-white">1</span>
+                <span>Plan Horizon &amp; Duration</span>
+              </legend>
+              <span class="text-[11px] font-medium text-stone-400">Select schedule</span>
+            </div>
 
-            <label class="duration-radio-tab flex items-center gap-3 p-3.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-[#245c43] has-[:checked]:ring-1 has-[:checked]:ring-[#245c43]" data-duration-tab>
-              <input type="radio" name="duration" value="weekly" class="sr-only">
-              <span class="h-9 w-9 rounded-lg bg-emerald-100/60 text-emerald-800 flex items-center justify-center flex-none" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h8M8 18h5"/></svg>
-              </span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Weekly Plan</strong>
-                <small class="block text-[11px] text-stone-500">7-Day rotation</small>
-              </span>
-            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Meal plan duration">
+              <label class="duration-radio-tab flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-emerald-50/70 has-[:checked]:border-[#173c2c] has-[:checked]:shadow-2xs" data-duration-tab>
+                <input type="radio" name="duration" value="daily" checked class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-8 w-8 rounded-lg bg-emerald-100 text-[#173c2c] flex items-center justify-center flex-none" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14h.01"/></svg>
+                  </span>
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white text-stone-600 border border-stone-200">1 Day</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Daily Plan</strong>
+                  <small class="block text-[11px] text-stone-500 mt-0.5">4 meal slots + options</small>
+                </div>
+              </label>
 
-            <label class="duration-radio-tab flex items-center gap-3 p-3.5 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-[#245c43] has-[:checked]:ring-1 has-[:checked]:ring-[#245c43]" data-duration-tab>
-              <input type="radio" name="duration" value="monthly" class="sr-only">
-              <span class="h-9 w-9 rounded-lg bg-emerald-100/60 text-emerald-800 flex items-center justify-center flex-none" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>
-              </span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Monthly Plan</strong>
-                <small class="block text-[11px] text-stone-500">4-Week blueprint</small>
-              </span>
-            </label>
+              <label class="duration-radio-tab flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-emerald-50/70 has-[:checked]:border-[#173c2c] has-[:checked]:shadow-2xs" data-duration-tab>
+                <input type="radio" name="duration" value="weekly" class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-8 w-8 rounded-lg bg-emerald-100 text-[#173c2c] flex items-center justify-center flex-none" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h8M8 18h5"/></svg>
+                  </span>
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white text-stone-600 border border-stone-200">7 Days</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Weekly Plan</strong>
+                  <small class="block text-[11px] text-stone-500 mt-0.5">Full week rotation</small>
+                </div>
+              </label>
+
+              <label class="duration-radio-tab flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-emerald-50/70 has-[:checked]:border-[#173c2c] has-[:checked]:shadow-2xs" data-duration-tab>
+                <input type="radio" name="duration" value="monthly" class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-8 w-8 rounded-lg bg-emerald-100 text-[#173c2c] flex items-center justify-center flex-none" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>
+                  </span>
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white text-stone-600 border border-stone-200">30 Days</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Monthly Plan</strong>
+                  <small class="block text-[11px] text-stone-500 mt-0.5">4-week blueprint</small>
+                </div>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Step 2 Card: Dietary Preference -->
+          <fieldset class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs m-0">
+            <div class="flex items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-stone-100">
+              <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173c2c] p-0">
+                <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-[#173c2c] text-[11px] font-bold text-white">2</span>
+                <span>Dietary Identity</span>
+              </legend>
+              <span class="text-[11px] font-medium text-stone-400">Food sources</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" role="radiogroup" aria-label="Dietary preference">
+              <label class="diet-radio-card flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-emerald-50/70 has-[:checked]:border-emerald-700 has-[:checked]:shadow-2xs" data-diet-tab data-diet-color="veg">
+                <input type="radio" name="diet_type" value="veg" checked class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-4 w-4 rounded-sm border-2 border-emerald-700 flex items-center justify-center"><span class="h-2 w-2 rounded-full bg-emerald-600"></span></span>
+                  <span class="text-[9px] font-bold uppercase text-emerald-800">Pure Veg</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Vegetarian</strong>
+                  <small class="block text-[10px] text-stone-500 mt-0.5">Dairy &amp; plants</small>
+                </div>
+              </label>
+
+              <label class="diet-radio-card flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-rose-50/70 has-[:checked]:border-rose-700 has-[:checked]:shadow-2xs" data-diet-tab data-diet-color="non-veg">
+                <input type="radio" name="diet_type" value="non-veg" class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-4 w-4 rounded-sm border-2 border-rose-700 flex items-center justify-center"><span class="h-2 w-2 rounded-full bg-rose-600"></span></span>
+                  <span class="text-[9px] font-bold uppercase text-rose-800">Non-Veg</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Non-Veg</strong>
+                  <small class="block text-[10px] text-stone-500 mt-0.5">Poultry, fish &amp; veg</small>
+                </div>
+              </label>
+
+              <label class="diet-radio-card flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-teal-50/70 has-[:checked]:border-teal-700 has-[:checked]:shadow-2xs" data-diet-tab data-diet-color="vegan">
+                <input type="radio" name="diet_type" value="vegan" class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-4 w-4 rounded-sm border-2 border-teal-700 flex items-center justify-center"><span class="h-2 w-2 rounded-full bg-teal-600"></span></span>
+                  <span class="text-[9px] font-bold uppercase text-teal-800">Plant</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Vegan</strong>
+                  <small class="block text-[10px] text-stone-500 mt-0.5">100% dairy-free</small>
+                </div>
+              </label>
+
+              <label class="diet-radio-card flex flex-col justify-between p-3.5 rounded-xl border-2 border-stone-200 bg-stone-50/40 cursor-pointer hover:bg-white hover:border-stone-300 transition has-[:checked]:bg-amber-50/70 has-[:checked]:border-amber-700 has-[:checked]:shadow-2xs" data-diet-tab data-diet-color="egg">
+                <input type="radio" name="diet_type" value="egg" class="sr-only">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="h-4 w-4 rounded-sm border-2 border-amber-700 flex items-center justify-center"><span class="h-2 w-2 rounded-full bg-amber-600"></span></span>
+                  <span class="text-[9px] font-bold uppercase text-amber-800">Ovo-Veg</span>
+                </div>
+                <div>
+                  <strong class="block text-xs font-bold text-stone-900">Eggetarian</strong>
+                  <small class="block text-[10px] text-stone-500 mt-0.5">Eggs + vegetarian</small>
+                </div>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        <!-- Step 3 Card: Health & Nutrition Focus Tags -->
+        <fieldset class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs m-0">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-stone-100">
+            <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173c2c] p-0">
+              <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-[#173c2c] text-[11px] font-bold text-white">3</span>
+              <span>Health &amp; Nutritional Focus Goals</span>
+            </legend>
+            <div class="flex items-center gap-2">
+              <span id="meal-plan-selected-focus-count" class="text-[11px] font-semibold text-stone-500">Optional — select any that apply</span>
+              <button type="button" id="clear-meal-preferences-btn" class="hidden text-[11px] font-bold text-stone-500 hover:text-red-700 underline cursor-pointer">Clear</button>
+            </div>
           </div>
-        </fieldset>
 
-        <!-- Step 2: Dietary Type Radio Selector -->
-        <fieldset class="mb-6 border-0 p-0">
-          <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-700 mb-3">
-            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#245c43] text-[10px] font-bold text-white">2</span>
-            <span>Select Dietary Preference</span>
-          </legend>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" role="radiogroup" aria-label="Dietary preference">
-            <label class="diet-radio-card flex items-center gap-2.5 p-3 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:ring-1 has-[:checked]:ring-emerald-600" data-diet-tab data-diet-color="veg">
-              <input type="radio" name="diet_type" value="veg" checked class="sr-only">
-              <span class="h-3 w-3 rounded-full bg-emerald-600 flex-none" aria-hidden="true"></span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Veg</strong>
-                <small class="block text-[10px] text-stone-500 truncate">Dairy &amp; plants</small>
-              </span>
-            </label>
-
-            <label class="diet-radio-card flex items-center gap-2.5 p-3 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-rose-50 has-[:checked]:border-rose-600 has-[:checked]:ring-1 has-[:checked]:ring-rose-600" data-diet-tab data-diet-color="non-veg">
-              <input type="radio" name="diet_type" value="non-veg" class="sr-only">
-              <span class="h-3 w-3 rounded-full bg-rose-600 flex-none" aria-hidden="true"></span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Non-Veg</strong>
-                <small class="block text-[10px] text-stone-500 truncate">Meat, fish &amp; plants</small>
-              </span>
-            </label>
-
-            <label class="diet-radio-card flex items-center gap-2.5 p-3 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-emerald-50 has-[:checked]:border-emerald-600 has-[:checked]:ring-1 has-[:checked]:ring-emerald-600" data-diet-tab data-diet-color="vegan">
-              <input type="radio" name="diet_type" value="vegan" class="sr-only">
-              <span class="h-3 w-3 rounded-full bg-teal-600 flex-none" aria-hidden="true"></span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Vegan</strong>
-                <small class="block text-[10px] text-stone-500 truncate">100% plant-based</small>
-              </span>
-            </label>
-
-            <label class="diet-radio-card flex items-center gap-2.5 p-3 rounded-xl border border-stone-200 cursor-pointer hover:bg-stone-50 transition has-[:checked]:bg-amber-50 has-[:checked]:border-amber-600 has-[:checked]:ring-1 has-[:checked]:ring-amber-600" data-diet-tab data-diet-color="egg">
-              <input type="radio" name="diet_type" value="egg" class="sr-only">
-              <span class="h-3 w-3 rounded-full bg-amber-600 flex-none" aria-hidden="true"></span>
-              <span class="min-w-0">
-                <strong class="block text-xs font-bold text-stone-900">Egg</strong>
-                <small class="block text-[10px] text-stone-500 truncate">Eggs &amp; veg</small>
-              </span>
-            </label>
-          </div>
-        </fieldset>
-
-        <!-- Step 3: Health & Nutrition Focus Tags -->
-        <fieldset class="mb-6 border-0 p-0">
-          <legend class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-700 mb-3">
-            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#245c43] text-[10px] font-bold text-white">3</span>
-            <span>Health &amp; Nutritional Focus Areas</span>
-          </legend>
           <input type="hidden" id="meal-plan-preferences-input" name="preferences" value="">
-          <div class="flex flex-wrap gap-2">
-            {% for preference in [
-              "Blood-sugar conscious",
-              "Heart-healthy",
-              "Weight management",
-              "Healthy weight gain",
-              "Plant-forward",
-              "High-protein",
-              "Gluten-free",
-              "Dairy-free"
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {% for preference, sub_desc in [
+              ("Blood-sugar conscious", "Low GI & steady glucose"),
+              ("Heart-healthy", "Low sodium & healthy fats"),
+              ("Weight management", "Calorie-controlled & filling"),
+              ("Healthy weight gain", "Calorie-dense whole foods"),
+              ("Plant-forward", "Rich in legumes & greens"),
+              ("High-protein", "Muscle repair & satiety"),
+              ("Gluten-free", "Millets, rice & naturally GF"),
+              ("Dairy-free", "Coconut, nut & plant bases")
             ] %}
-              <button type="button" class="meal-preference px-3 py-1.5 rounded-full border border-stone-200 bg-white text-xs font-semibold text-stone-700 hover:border-emerald-300 hover:bg-emerald-50/50 transition cursor-pointer flex items-center gap-1.5 aria-pressed:bg-emerald-100 aria-pressed:border-emerald-500 aria-pressed:text-emerald-900" data-preference="{{ preference }}" aria-pressed="false">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                <span>{{ preference }}</span>
+              <button
+                type="button"
+                class="meal-preference text-left p-3 rounded-xl border border-stone-200 bg-stone-50/40 hover:border-emerald-400 hover:bg-emerald-50/40 transition cursor-pointer flex items-start gap-2.5 aria-pressed:bg-[#173c2c] aria-pressed:border-[#173c2c] aria-pressed:text-white group"
+                data-preference="{{ preference }}"
+                aria-pressed="false"
+              >
+                <span class="mt-1 h-2 w-2 rounded-full bg-emerald-500 group-aria-pressed:bg-emerald-300 flex-none" aria-hidden="true"></span>
+                <span class="min-w-0">
+                  <strong class="block text-xs font-bold text-stone-800 group-aria-pressed:text-white truncate">{{ preference }}</strong>
+                  <small class="block text-[10px] text-stone-500 group-aria-pressed:text-emerald-100/90 truncate">{{ sub_desc }}</small>
+                </span>
               </button>
             {% endfor %}
           </div>
+
           {% if current_user and current_user.allergies %}
-            <p class="m-0 mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900">
+            <p class="m-0 mt-3.5 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span><strong>Profile allergies active:</strong> {{ current_user.allergies }}</span>
+              <span><strong>Profile allergies automatically excluded:</strong> {{ current_user.allergies }}</span>
             </p>
           {% endif %}
         </fieldset>
 
-        <!-- Step 4: Multimodal Request (Text + Photo + Voice) -->
-        <div class="mb-4">
-          <label for="meal-plan-request" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
-            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#245c43] text-[10px] font-bold text-white">4</span>
-            <span>Custom Preferences, Pantry Photo, or Voice Note</span>
-          </label>
-          <div class="rounded-2xl border border-stone-200 bg-stone-50/50 p-3 focus-within:border-[#245c43] focus-within:ring-2 focus-within:ring-[#245c43]/15 transition">
-            <textarea id="meal-plan-request" name="custom_request" rows="3" maxlength="2000" placeholder="Tell me your daily routine, regional cuisine taste, ingredients in your pantry, or record a voice note below…" class="w-full bg-transparent border-0 text-xs sm:text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none resize-none leading-relaxed"></textarea>
+        <!-- Step 4 Card: Multimodal Custom Request & Quick Prompts -->
+        <div class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-stone-100">
+            <label for="meal-plan-request" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173c2c]">
+              <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-[#173c2c] text-[11px] font-bold text-white">4</span>
+              <span>Regional Cuisine, Pantry Photo, or Voice Note</span>
+            </label>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[10px] font-bold uppercase text-stone-400 mr-1">Quick Fill:</span>
+              <button type="button" data-meal-quick-prompt="South Indian high-protein meals with millets, idli, sambar, and minimal coconut oil" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-[11px] font-semibold text-stone-700 hover:text-[#173c2c] border border-stone-200 transition cursor-pointer">South Indian Millet</button>
+              <button type="button" data-meal-quick-prompt="North Indian home-style rotis, dal tadka, paneer, and seasonal sabzi with low oil" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-[11px] font-semibold text-stone-700 hover:text-[#173c2c] border border-stone-200 transition cursor-pointer">North Indian Thali</button>
+              <button type="button" data-meal-quick-prompt="Quick 15-minute high-protein Indian breakfasts and packable office lunches" class="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-[11px] font-semibold text-stone-700 hover:text-[#173c2c] border border-stone-200 transition cursor-pointer">Quick 15-Min Office</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 focus-within:bg-white focus-within:border-[#245c43] focus-within:ring-2 focus-within:ring-[#245c43]/15 transition">
+            <textarea id="meal-plan-request" name="custom_request" rows="2" maxlength="2000" placeholder="Tell NutriGuide your regional cuisine taste, cooking oil preference, ingredients in your fridge, or record a voice note…" class="w-full bg-transparent border-0 text-xs sm:text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none resize-none leading-relaxed"></textarea>
 
             <div id="meal-plan-attachment-chips" class="flex flex-wrap gap-2 my-2" aria-live="polite"></div>
 
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-200/80">
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-stone-200/80">
               <div class="flex flex-wrap items-center gap-2">
                 <input id="meal-plan-image" name="image" type="file" accept="image/jpeg,image/png,image/webp" class="hidden">
                 <input id="meal-plan-voice" name="voice" type="file" accept="audio/wav,audio/mpeg" class="hidden">
@@ -174,47 +237,56 @@
               <span class="text-[10px] text-stone-400">Supports text, JPG/PNG &amp; WAV/MP3</span>
             </div>
           </div>
-        </div>
 
-        <!-- Form Submit Footer -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-stone-100">
-          <p class="text-[11px] text-stone-500 max-w-md leading-relaxed">General nutritional ideas only. For clinical therapy or illness treatment, consult a registered dietitian.</p>
-          <button id="generate-meal-plan" type="submit" class="px-5 py-2.5 rounded-xl bg-[#245c43] hover:bg-[#173c2c] text-white text-xs font-bold shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-50">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-            <span id="generate-meal-plan-label">Create daily meal plan</span>
-            <span aria-hidden="true">→</span>
-            <span id="meal-plan-spinner" class="hidden ml-1 h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" aria-hidden="true"></span>
-          </button>
-        </div>
+          <!-- Form Submit Footer -->
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 mt-4 border-t border-stone-100">
+            <p class="text-[11px] text-stone-500 max-w-md leading-relaxed m-0">
+              Each generated meal card includes estimated IFCT mini macros and an interactive <strong>⇄ Swap Dish</strong> button.
+            </p>
+            <button id="generate-meal-plan" type="submit" class="px-6 py-3 rounded-xl bg-[#245c43] hover:bg-[#173c2c] text-white text-xs font-bold shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-50">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span id="generate-meal-plan-label">Create daily meal plan</span>
+              <span aria-hidden="true">→</span>
+              <span id="meal-plan-spinner" class="hidden ml-1 h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" aria-hidden="true"></span>
+            </button>
+          </div>
 
-        <p id="meal-plan-error" class="mt-4 hidden rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700 font-medium" role="alert"></p>
+          <p id="meal-plan-error" class="mt-4 hidden rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700 font-medium" role="alert"></p>
+        </div>
       </form>
 
       <!-- Generated Meal Plan Results -->
-      <section id="meal-plan-result" class="hidden pb-10" aria-live="polite">
-        <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-white to-emerald-50/40 p-5 sm:p-6 shadow-xs mb-6">
-          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[#245c43]">Clinical Rationale &amp; Balance</p>
+      <section id="meal-plan-result" class="hidden pb-10 space-y-5" aria-live="polite">
+        <div class="rounded-2xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-[#245c43]"></span>
+              <p class="m-0 text-xs font-bold uppercase tracking-wider text-[#173c2c]">Clinical Rationale &amp; Plan Overview</p>
+            </div>
             <div id="meal-plan-meta-badges" class="flex flex-wrap items-center gap-1.5"></div>
           </div>
           <p id="meal-plan-transcription" class="hidden mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-medium text-emerald-900"></p>
           <p id="meal-plan-summary" class="m-0 text-xs sm:text-sm leading-relaxed text-stone-700"></p>
+
+          <!-- Plan-Wide Daily Macro Overview Bar (populated by PyScript) -->
+          <div id="meal-plan-macro-overview" class="mt-4 pt-4 border-t border-stone-100 grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
         </div>
-        <div id="meal-plan-sections" class="meal-sections-grid meal-section-card space-y-4"></div>
+
+        <div id="meal-plan-sections" class="meal-sections-grid meal-section-card space-y-5"></div>
       </section>
     </section>
 
     <!-- Saved Meal Plans Sidebar -->
-    <aside class="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs" aria-label="Previous meal plans">
+    <aside class="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs lg:sticky lg:top-6" aria-label="Previous meal plans">
       <div class="mb-3 flex items-center justify-between gap-2 border-b border-stone-100 pb-3">
         <div>
-          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-stone-400">Library</p>
-          <h2 class="font-serif m-0 text-lg font-bold text-[#173c2c]">Saved Plans</h2>
+          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-stone-400">Saved Library</p>
+          <h2 class="font-serif m-0 text-lg font-bold text-[#173c2c]">Meal Plans</h2>
         </div>
         <span id="meal-plan-history-count" class="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-800">0</span>
       </div>
       <p id="meal-plan-history-status" class="m-0 py-2 text-xs leading-relaxed text-stone-500" role="status">Loading saved plans…</p>
-      <div id="meal-plan-history-list" class="space-y-1.5" aria-live="polite"></div>
+      <div id="meal-plan-history-list" class="space-y-2" aria-live="polite"></div>
     </aside>
   </div>
 </main>

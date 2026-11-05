@@ -66,6 +66,40 @@ npm run build:css
 
 Node/npm is only required to build the CSS; the deployed frontend is Jinja-rendered HTML and static CSS, served independently from Django.
 
+### 5. Frontend Architecture: Pure Python with PyScript (Strict Zero-JavaScript Policy)
+
+> [!IMPORTANT]
+> **Strict Policy for Developers and AI Coding Agents**:
+> NutriGuide-AI is intentionally engineered as a **100% pure Python web application**.
+> - **NO JavaScript files (`.js`)** are permitted in the client-side codebase.
+> - **NO `<script>` application blocks or inline JS attributes** (`onclick="..."`, `onsubmit="..."`, `onchange="..."`) are permitted in HTML templates.
+> - All client-side reactivity, event delegation, DOM manipulation, modals, and asynchronous state handling **MUST be written exclusively in Python using PyScript / Pyodide** under `web_frontend/src/` (`main.py`, `chat.py`, `tracker.py`, `groups.py`, `meal_planner.py`, `profile.py`, `auth.py`, `ui.py`).
+> - Future coding tasks and AI agent calls must preserve this pure-Python constraint.
+
+All browser-side interactivity uses:
+1. **PyScript / Pyodide (Python 3.14 WebAssembly)**: Executes Python modules directly in the browser. Global event handlers use `@when("click", "body")`, `@when("submit", "body")`, and `@when("change", "body")` in `web_frontend/src/main.py` to route events to domain modules.
+2. **HTMX**: Declarative server-side swaps (`hx-post`, `hx-target`, `hx-swap="outerHTML"`) to fetch server-rendered Jinja fragments without client JavaScript.
+
+---
+
+## Indian Household Recipe Customization & Personalization Engine
+
+Every Indian household cooks differently. The same dish (e.g. *Avalakki*, *Poha*, *Khichdi*, *Sambar*) uses distinct staple fats and ingredients across regions:
+- **Cooking Oils & Fats**: Coconut oil in Kerala/Coastal Karnataka, Mustard oil in Bengal/Bihar/UP, Gingelly/Sesame oil in Tamil Nadu, and Desi Ghee in North/Western India.
+- **Custom Additions / Ratios**: Peanuts, curry leaves, cashews, vegetables, or custom gram portions.
+
+### Features
+1. **In-Place Transformation & Editable Title/Description**: Clicking **"Customize Recipe"** or the **"Edit"** button next to the dish title converts the static view into an interactive editable form directly in the card. Users can personalize the **Dish Title**, **Dish Description / Notes**, and constituent ingredients.
+2. **Single-Line Composition**: Ingredient Name, Portion Description, Weight (grams), and Delete action display neatly on a single horizontal row across all viewports.
+3. **Delete Confirmation Popup**: Deleting an ingredient row triggers a universal modal (`#confirm-delete-modal`) confirming the specific ingredient deletion before modifying the recipe.
+4. **Quick-Add Staples**: Shortcut chips (`+ Ghee (15g)`, `+ Coconut oil (15g)`, `+ Mustard oil (15g)`, `+ Peanuts (20g)`, `+ Curry leaves (5g)`) allow adding common staples in one click.
+5. **Verified IFCT 2017 Recalculation**: Submitting recalculates both macronutrients and micronutrients against the Indian Food Composition Tables (IFCT 2017) reference database.
+6. **Live Tracker Sync**: If the meal was previously logged to the nutrition diary, saving the customized recipe automatically synchronizes the linked [`TrackedMeal`](file:///d:/Agentic_AI/NutriGuide-AI/backend/assistant/models.py) record with the new title and calculated nutrients.
+7. **`UserCustomRecipe` Database Table**: Stores both baseline AI suggested values (`ai_dish_name`, `ai_description`, `original_ingredients`) and user-customized values (`dish_name`, `description`, `customized_ingredients`) to power future recommendation engines and fine-tune localized LLM models.
+8. **Household Memory**: LangGraph's `identify_dish_node` queries `UserCustomRecipe` to automatically pre-populate known household dish names, descriptions, and ingredient preferences when analyzing future meals.
+
+---
+
 Chat conversations are stored in a separate `chat_history.sqlite3` database, not the nutrient database. Apply its schema separately:
 
 ```powershell
@@ -217,6 +251,8 @@ NutriGuide-AI enforces a strict separation between **AI culinary perception** an
 | `GET` | `/api/nutrition/health` | Verifies API status and the active inference backend's connectivity. |
 | `POST` | `/api/nutrition/analyze/text` | Accepts JSON `{"text": "...", "user_id": "..."}`, identifies dish/ingredients via AI, and calculates database nutrients. |
 | `POST` | `/api/nutrition/analyze` | Accepts `multipart/form-data` with `text`, `image` (JPEG/PNG/WebP), and/or `voice` (WAV/MP3). |
+| `POST` | `/api/chat-history/conversations/{conv_id}/messages/{msg_id}/customize-recipe` | Customizes recipe ingredients/weights, recalculates IFCT nutrition, stores `UserCustomRecipe`, and updates `TrackedMeal`. |
+| `POST` | `/api/chat-history/conversations/{conv_id}/messages/{msg_id}/reset-recipe` | Reverts customized recipe back to baseline AI ingredients. |
 
 ---
 
