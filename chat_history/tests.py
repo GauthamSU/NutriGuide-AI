@@ -675,6 +675,180 @@ class UserCustomRecipeTests(TestCase):
         self.assertIn("analysis", data)
         self.assertGreater(data["analysis"]["total_macronutrients"]["calories_kcal"], 0)
 
+    def test_customize_recipe_direct_endpoint(self):
+        msg = self._create_message("Poha")
+        msg_id = str(msg.id)
+
+        response = self.client.post(
+            f"/api/chat-history/messages/{msg_id}/customize-recipe",
+            data={
+                "owner_id": self.owner_id,
+                "dish_name": "Poha Customized",
+                "notes": "Added peanuts and curry leaves",
+                "ingredients": [
+                    {
+                        "food_name": "Rice flakes",
+                        "estimated_weight_grams": 70,
+                        "serving_size_description": "1 cup",
+                    },
+                    {
+                        "food_name": "Peanuts",
+                        "estimated_weight_grams": 20,
+                        "serving_size_description": "2 tbsp",
+                    },
+                ],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["is_customized"])
+        self.assertEqual(data["dish_name"], "Poha Customized")
+
+        # Test reset recipe endpoint
+        reset_resp = self.client.post(
+            f"/api/chat-history/messages/{msg_id}/reset-recipe?owner_id={self.owner_id}",
+        )
+        self.assertEqual(reset_resp.status_code, 200)
+        reset_data = reset_resp.json()
+        self.assertFalse(reset_data["is_customized"])
+
+    def test_get_conversation_includes_message_id_in_result(self):
+        msg = self._create_message("Dosa")
+        from backend.assistant.services import get_conversation
+        conv_data = get_conversation(self.owner_id, self.conversation_id)
+        self.assertTrue(len(conv_data["messages"]) > 0)
+        first_msg = conv_data["messages"][0]
+        self.assertEqual(first_msg["result"].get("message_id"), first_msg["id"])
+
+    def test_frontend_server_recipe_route_parsing(self):
+        from unittest.mock import patch, MagicMock
+        from web_frontend.server import FrontendHandler
+        import io
+
+        body = b'{"conversation_id": "conv-123", "message_id": "msg-456", "ingredients": []}'
+        handler = object.__new__(FrontendHandler)
+        handler.headers = {"Content-Type": "application/json", "Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._get_effective_owner_id = MagicMock(return_value="owner-1")
+        handler._get_auth_token = MagicMock(return_value=None)
+        handler._auth_headers = MagicMock(return_value={})
+        handler._send_json = MagicMock()
+        handler.path = "/chats/customize-recipe"
+
+        # Mock httpx client post to verify URL called
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value = mock_client
+            mock_resp = MagicMock()
+            mock_resp.is_success = True
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {"status": "ok", "is_customized": True}
+            mock_client.post.return_value = mock_resp
+
+            handler.do_POST()
+
+            self.assertTrue(mock_client.post.called)
+            called_url = mock_client.post.call_args[0][0]
+            # Must NOT contain duplicate customize-recipe as msg_id!
+            self.assertIn("/conversations/conv-123/messages/msg-456/customize-recipe", called_url)
+            self.assertNotIn("customize-recipe/customize-recipe", called_url)
+
+    def test_frontend_server_recipe_post_browser_redirect(self):
+        from unittest.mock import patch, MagicMock
+        from web_frontend.server import FrontendHandler
+        import io
+
+        body = b'{"conversation_id": "conv-123", "message_id": "msg-456", "ingredients": []}'
+        handler = object.__new__(FrontendHandler)
+        handler.headers = {
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+            "Accept": "text/html,application/xhtml+xml",
+        }
+        handler.rfile = io.BytesIO(body)
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._get_effective_owner_id = MagicMock(return_value="owner-1")
+        handler._get_auth_token = MagicMock(return_value=None)
+        handler._auth_headers = MagicMock(return_value={})
+        handler._send_redirect = MagicMock()
+        handler.path = "/chats/customize-recipe"
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value = mock_client
+            mock_resp = MagicMock()
+            mock_resp.is_success = True
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {"status": "ok", "is_customized": True}
+            mock_client.post.return_value = mock_resp
+
+            handler.do_POST()
+
+            handler._send_redirect.assert_called_once_with("/chats/conv-123", status=303)
+
+    def test_frontend_server_recipe_get_redirects_to_root(self):
+        from unittest.mock import MagicMock
+        from web_frontend.server import FrontendHandler
+
+        handler = object.__new__(FrontendHandler)
+        handler.headers = {"Accept": "text/html"}
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._send_redirect = MagicMock()
+        handler.path = "/chats/customize-recipe"
+
+        handler.do_GET()
+
+        handler._send_redirect.assert_called_once_with("/", status=303)
+
+    def test_frontend_server_tracker_log_browser_redirect(self):
+        from unittest.mock import patch, MagicMock
+        from web_frontend.server import FrontendHandler
+        import io
+
+        body = b'{"conversation_id": "conv-789", "message_id": "msg-999", "meal_title": "Rice"}'
+        handler = object.__new__(FrontendHandler)
+        handler.headers = {
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+            "Accept": "text/html,application/xhtml+xml",
+        }
+        handler.rfile = io.BytesIO(body)
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._get_effective_owner_id = MagicMock(return_value="owner-1")
+        handler._get_auth_token = MagicMock(return_value=None)
+        handler._auth_headers = MagicMock(return_value={})
+        handler._send_redirect = MagicMock()
+        handler.path = "/tracker/log"
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value = mock_client
+            mock_resp = MagicMock()
+            mock_resp.is_success = True
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {"status": "ok", "meal": {"id": "log-1"}}
+            mock_client.post.return_value = mock_resp
+
+            handler.do_POST()
+
+            handler._send_redirect.assert_called_once_with("/chats/conv-789", status=303)
+
+    def test_frontend_server_tracker_log_get_redirects_to_tracker(self):
+        from unittest.mock import MagicMock
+        from web_frontend.server import FrontendHandler
+
+        handler = object.__new__(FrontendHandler)
+        handler.headers = {"Accept": "text/html"}
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._send_redirect = MagicMock()
+        handler.path = "/tracker/log"
+
+        handler.do_GET()
+
+        handler._send_redirect.assert_called_once_with("/tracker", status=303)
+
     def test_user_custom_recipe_admin_registration(self):
         from chat_history.admin import UserCustomRecipeAdmin
         self.assertIn(UserCustomRecipe, admin.site._registry)

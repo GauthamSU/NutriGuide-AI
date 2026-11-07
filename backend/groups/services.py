@@ -47,16 +47,33 @@ def _compute_member_nutrition(member_user, group: NutritionGroup) -> Dict[str, A
         "dietary_fiber_g": 0.0,
     }
     recent_meals: List[Dict[str, Any]] = []
+    seen_identifiers = set()
 
     # 1. Group-specific meal logs
     group_logs = GroupMealLog.objects.filter(group=group, user=member_user).order_by("-created_at")
     for log in group_logs:
+        cals = float(log.calories_kcal or 0.0)
+        prot = float(log.protein_g or 0.0)
+        carbs = float(log.carbohydrates_g or 0.0)
+        fat = float(log.total_fat_g or 0.0)
+        fiber = float(log.dietary_fiber_g or 0.0)
+
+        # Ignore empty/deleted entries with 0 calories and 0 macros
+        if cals <= 0 and prot <= 0 and carbs <= 0 and fat <= 0:
+            continue
+
+        clean_title = (log.meal_title or "").strip().lower()
+        dedup_key = f"{clean_title}_{log.created_at.strftime('%Y-%m-%d_%H:%M')}"
+        if dedup_key in seen_identifiers:
+            continue
+        seen_identifiers.add(dedup_key)
+
         totals["meals_count"] += 1
-        totals["calories_kcal"] += float(log.calories_kcal or 0.0)
-        totals["protein_g"] += float(log.protein_g or 0.0)
-        totals["carbohydrates_g"] += float(log.carbohydrates_g or 0.0)
-        totals["total_fat_g"] += float(log.total_fat_g or 0.0)
-        totals["dietary_fiber_g"] += float(log.dietary_fiber_g or 0.0)
+        totals["calories_kcal"] += cals
+        totals["protein_g"] += prot
+        totals["carbohydrates_g"] += carbs
+        totals["total_fat_g"] += fat
+        totals["dietary_fiber_g"] += fiber
         pic_url = get_profile_picture_url(profile)
         user_dict = {
             "username": member_user.username,
@@ -95,6 +112,22 @@ def _compute_member_nutrition(member_user, group: NutritionGroup) -> Dict[str, A
         carbs = float(macros.get("carbohydrates_g") or 0.0)
         fat = float(macros.get("total_fat_g") or 0.0)
         fiber = float(macros.get("dietary_fiber_g") or 0.0)
+
+        # Ignore empty/deleted entries with 0 calories and 0 macros
+        if cals <= 0 and prot <= 0 and carbs <= 0 and fat <= 0:
+            continue
+
+        clean_title = (tm.meal_title or "").strip().lower()
+        if tm.source_message_id:
+            msg_key = f"msg_{tm.source_message_id}"
+            if msg_key in seen_identifiers:
+                continue
+            seen_identifiers.add(msg_key)
+
+        dedup_key = f"{clean_title}_{tm.created_at.strftime('%Y-%m-%d_%H:%M')}"
+        if dedup_key in seen_identifiers:
+            continue
+        seen_identifiers.add(dedup_key)
 
         totals["meals_count"] += 1
         totals["calories_kcal"] += cals
@@ -897,3 +930,61 @@ def log_meal_to_group(
         serving_notes=(serving_notes or "").strip()[:1000],
     )
     return get_group_detail(str(group.id), current_user=user)
+
+
+def delete_group_meal(user, group_id: str, meal_id: str) -> Dict[str, Any]:
+    """
+    Delete a meal entry displayed in a group feed.
+    Can be a direct GroupMealLog or a member's TrackedMeal.
+    Permitted if the caller is the author of the meal or a group admin.
+    """
+    try:
+        g_uuid = uuid.UUID(str(group_id))
+        m_uuid = uuid.UUID(str(meal_id))
+    except (ValueError, TypeError) as exc:
+        raise HttpError(400, "Invalid group or meal ID format.") from exc
+
+    group = NutritionGroup.objects.filter(id=g_uuid).first()
+    if not group:
+        raise HttpError(404, "Group not found.")
+
+    membership = GroupMembership.objects.filter(group=group, user=user).first()
+    if not membership:
+        raise HttpError(403, "You must be a member of this group.")
+
+    is_admin = group.created_by_id == user.id or membership.role == GroupMembership.ROLE_ADMIN
+
+    # 1. Check GroupMealLog
+    gml = GroupMealLog.objects.filter(id=m_uuid, group=group).first()
+    if gml:
+        if not is_admin and gml.user_id != user.id:
+            raise HttpError(403, "You can only delete your own meal entries.")
+        gml.delete()
+        return {"status": "ok", "deleted_id": str(m_uuid)}
+
+    # 2. Check TrackedMeal
+    tm = TrackedMeal.objects.filter(id=m_uuid).first()
+    if tm:
+        profile = ensure_user_profile(user)
+        is_author = (tm.user_id == user.id) or (tm.owner_id == str(profile.owner_id))
+        if not is_admin and not is_author:
+            raise HttpError(403, "You can only delete your own meal entries.")
+        source_msg_id = tm.source_message_id
+        tm.delete()
+        if source_msg_id:
+            try:
+                msg_uuid = uuid.UUID(source_msg_id)
+                from chat_history.models import ChatMessage
+                chat_msg = ChatMessage.objects.using(DATABASE_ALIAS).filter(id=msg_uuid).first()
+                if chat_msg and isinstance(chat_msg.ai_response, dict):
+                    ai_resp = dict(chat_msg.ai_response)
+                    ai_resp["logged_to_tracker"] = False
+                    ai_resp.pop("tracker_log_id", None)
+                    chat_msg.ai_response = ai_resp
+                    chat_msg.save(using=DATABASE_ALIAS, update_fields=["ai_response"])
+            except Exception:
+                pass
+        return {"status": "ok", "deleted_id": str(m_uuid)}
+
+    raise HttpError(404, "Meal entry not found.")
+

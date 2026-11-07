@@ -1415,6 +1415,90 @@ class NutritionGroupsTests(TestCase):
         bob_detail = self.client.get(f"/api/groups/{group_id}", **self.bob_headers).json()
         self.assertFalse(bob_detail["group"]["is_member"])
 
+    def test_group_nutrition_deduplication_and_ignores_zero_calories(self):
+        from backend.tracker.models import TrackedMeal
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        alice_user = User.objects.get(username="alice")
+
+        create_resp = self.client.post(
+            "/api/groups",
+            data={"name": "Deduplication Test Group", "is_public": True},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        group_id = create_resp.json()["group"]["id"]
+
+        # Create valid meal
+        tm1 = TrackedMeal.objects.create(
+            user=alice_user,
+            owner_id=str(alice_user.profile.owner_id),
+            meal_title="Lentil Curry",
+            meal_type="Lunch",
+            source_message_id="msg-dup-1",
+            macronutrients={"calories_kcal": 450.0, "protein_g": 18.0, "carbohydrates_g": 60.0, "total_fat_g": 10.0, "dietary_fiber_g": 8.0},
+        )
+        # Create duplicate meal with same source_message_id
+        tm2 = TrackedMeal.objects.create(
+            user=alice_user,
+            owner_id=str(alice_user.profile.owner_id),
+            meal_title="Lentil Curry",
+            meal_type="Meal",
+            source_message_id="msg-dup-1",
+            macronutrients={"calories_kcal": 450.0, "protein_g": 18.0, "carbohydrates_g": 60.0, "total_fat_g": 10.0, "dietary_fiber_g": 8.0},
+        )
+        # Create 0-calorie deleted/orphaned meal
+        tm3 = TrackedMeal.objects.create(
+            user=alice_user,
+            owner_id=str(alice_user.profile.owner_id),
+            meal_title="Lentil Curry",
+            meal_type="Meal",
+            macronutrients={"calories_kcal": 0.0, "protein_g": 0.0, "carbohydrates_g": 0.0, "total_fat_g": 0.0},
+        )
+
+        detail = self.client.get(f"/api/groups/{group_id}", **self.alice_headers).json()
+        coll = detail["group"]["collective_nutrition"]
+        # Only 1 meal should be counted and only 450 kcal
+        self.assertEqual(coll["total_meals_count"], 1)
+        self.assertEqual(coll["total_calories_kcal"], 450.0)
+        # Feed should only contain 1 card
+        self.assertEqual(len(detail["group"]["recent_meals"]), 1)
+        self.assertIn(detail["group"]["recent_meals"][0]["id"], [str(tm1.id), str(tm2.id)])
+
+    def test_delete_group_meal(self):
+        create_resp = self.client.post(
+            "/api/groups",
+            data={"name": "Meal Deletion Group", "is_public": True},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        group_id = create_resp.json()["group"]["id"]
+
+        # Alice logs a meal to the group
+        log_resp = self.client.post(
+            f"/api/groups/{group_id}/meals",
+            data={"meal_title": "100g Rice, parboiled, milled", "meal_type": "Lunch"},
+            content_type="application/json",
+            **self.alice_headers,
+        )
+        self.assertEqual(log_resp.status_code, 200)
+        meals = log_resp.json()["group"]["recent_meals"]
+        self.assertEqual(len(meals), 1)
+        meal_id = meals[0]["id"]
+
+        # Alice deletes the meal
+        del_resp = self.client.post(
+            f"/api/groups/{group_id}/meals/{meal_id}/delete",
+            **self.alice_headers,
+        )
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertEqual(del_resp.json()["status"], "ok")
+
+        # Group feed is now empty
+        detail = self.client.get(f"/api/groups/{group_id}", **self.alice_headers).json()
+        self.assertEqual(len(detail["group"]["recent_meals"]), 0)
+        self.assertEqual(detail["group"]["collective_nutrition"]["total_meals_count"], 0)
+
 
 class ExplicitTrackerAndDeletionTests(TestCase):
     databases = {"default", "nutrition"}

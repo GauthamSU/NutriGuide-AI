@@ -836,6 +836,10 @@ async def handle_recipe_customize_submit(form) -> None:
     """
     msg_id = getattr(form.dataset, "recipeFormMsg", "") or getattr(form, "id", "").replace("recipe-form-", "")
     if not msg_id:
+        m_input = form.querySelector('input[name="message_id"]')
+        if m_input:
+            msg_id = (getattr(m_input, "value", "") or "").strip()
+    if not msg_id:
         return
 
     conv_id = getattr(form.dataset, "conversationId", "")
@@ -905,6 +909,7 @@ async def handle_recipe_customize_submit(form) -> None:
             html = await resp.text()
             target_section = window.document.getElementById(f"results-{msg_id}")
             if target_section:
+                CLIENT_INGREDIENT_STATES.pop(msg_id, None)
                 target_section.outerHTML = html
                 # Re-run real-time recalculator to keep local state synced
                 recalculate_recipe_macros_realtime(msg_id)
@@ -943,6 +948,7 @@ async def handle_reset_recipe(msg_id: str, conv_id: str = "") -> None:
             html = await resp.text()
             target_section = window.document.getElementById(f"results-{msg_id}")
             if target_section:
+                CLIENT_INGREDIENT_STATES.pop(msg_id, None)
                 target_section.outerHTML = html
                 recalculate_recipe_macros_realtime(msg_id)
     except Exception as exc:

@@ -267,9 +267,12 @@ def log_meal_to_tracker(
         raise HttpError(400, "owner_id or authenticated user is required to log a meal to the tracker.")
 
     clean_msg_id = (message_id or "").strip()
+    clean_title = str(meal_title or "").strip()
+    user_filter = Q(user=user) if user else Q()
+
     if clean_msg_id:
         existing = TrackedMeal.objects.filter(
-            owner_id=effective_owner_id,
+            (Q(owner_id=effective_owner_id) | user_filter),
             source_message_id=clean_msg_id,
         ).first()
         if existing is not None:
@@ -277,6 +280,20 @@ def log_meal_to_tracker(
                 "status": "ok",
                 "already_logged": True,
                 "meal": serialize_tracked_meal(existing),
+            }
+    elif clean_title:
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(seconds=15)
+        recent_dup = TrackedMeal.objects.filter(
+            (Q(owner_id=effective_owner_id) | user_filter),
+            meal_title__iexact=clean_title,
+            created_at__gte=cutoff,
+        ).first()
+        if recent_dup is not None:
+            return {
+                "status": "ok",
+                "already_logged": True,
+                "meal": serialize_tracked_meal(recent_dup),
             }
 
     resolved_analysis = analysis

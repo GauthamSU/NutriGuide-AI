@@ -79,6 +79,7 @@ from meal_planner import (
 from groups import (
     focus_public_search,
     handle_create_group,
+    handle_delete_group_meal,
     handle_group_meal_image_change,
     handle_group_meal_voice_change,
     handle_group_page_invite_member,
@@ -229,6 +230,20 @@ async def handle_global_clicks(event):
             )
         return
 
+    # 7b. Delete Meal from Group Feed (With Confirmation Popup)
+    del_grp_meal_btn = target.closest(".delete-group-meal-btn, [data-delete-group-meal-id]")
+    if del_grp_meal_btn:
+        meal_id = getattr(del_grp_meal_btn.dataset, "deleteGroupMealId", "") or getattr(del_grp_meal_btn.dataset, "mealId", "")
+        group_id = getattr(del_grp_meal_btn.dataset, "deleteGroupId", "") or getattr(del_grp_meal_btn.dataset, "groupId", "")
+        meal_title = getattr(del_grp_meal_btn.dataset, "mealTitle", "") or "this meal"
+        if meal_id and group_id:
+            request_delete_confirmation(
+                "Delete Group Meal",
+                f"Are you sure you want to remove '{meal_title}' from this group's feed? The group's collective intake will update immediately.",
+                lambda: handle_delete_group_meal(group_id, meal_id),
+            )
+        return
+
     # 8. Chat Turn: Pop-up "Log to Tracker" Modal
     log_tracker_btn = target.closest("[data-log-to-tracker-btn], .log-tracker-btn, .turn-action-log")
     if log_tracker_btn:
@@ -239,6 +254,22 @@ async def handle_global_clicks(event):
         ):
             return
         open_chat_log_modal(log_tracker_btn)
+        return
+
+    # 8b. Chat Turn "Log to Tracker" Modal Confirm Submit
+    log_modal_submit = target.closest("#log-modal-submit-btn")
+    if log_modal_submit:
+        form = window.document.getElementById("log-to-tracker-form")
+        if form:
+            await handle_submit_chat_log(form)
+        return
+
+    # 8c. Manual Tracker Form Submit
+    manual_tracker_submit = target.closest("#manual-tracker-submit-btn")
+    if manual_tracker_submit:
+        form = window.document.getElementById("manual-tracker-form")
+        if form:
+            await handle_submit_manual_tracker_log(form)
         return
 
     # 9. Delete Individual Chat Message (With Confirmation Popup)
@@ -265,6 +296,14 @@ async def handle_global_clicks(event):
                 f"Are you sure you want to delete {c_label}? All messages in this chat will be permanently deleted.",
                 lambda: handle_delete_conversation(conv_id),
             )
+        return
+
+    # 10a. Recipe Customization: Save & Recalculate Nutrition
+    save_recipe_btn = target.closest(".save-recipe-btn, [data-save-recipe]")
+    if save_recipe_btn:
+        form = save_recipe_btn.closest(".recipe-customize-form, form")
+        if form:
+            await handle_recipe_customize_submit(form)
         return
 
     # 10b. Recipe Customization: Toggle In-Place Form
@@ -334,7 +373,7 @@ async def handle_global_clicks(event):
     # 10g. Recipe Customization: Reset Recipe to Original AI Estimate (with confirmation popup)
     reset_rec_btn = target.closest("[data-reset-recipe-btn], .reset-recipe-btn")
     if reset_rec_btn:
-        msg_id = getattr(reset_rec_btn.dataset, "resetRecipeMsg", "") or getattr(reset_rec_btn.dataset, "msgId", "")
+        msg_id = getattr(reset_rec_btn.dataset, "resetRecipe", "") or getattr(reset_rec_btn.dataset, "resetRecipeMsg", "") or getattr(reset_rec_btn.dataset, "msgId", "")
         conv_id = getattr(reset_rec_btn.dataset, "conversationId", "") or ""
         if msg_id:
             request_delete_confirmation(
@@ -722,6 +761,14 @@ def handle_global_keydown(event):
     target = getattr(event, "target", None)
     if target and getattr(target, "id", "") == "meal-description":
         handle_enter(event)
+    elif target and hasattr(target, "closest") and (
+        target.closest(".recipe-customize-form")
+        or target.closest("#log-to-tracker-form")
+        or target.closest("#manual-tracker-form")
+    ):
+        key = getattr(event, "key", "")
+        if key == "Enter" and getattr(target, "tagName", "").lower() != "textarea":
+            event.preventDefault()
 
 
 # ─── HTMX Lifecycle Coordination & Page Anchors ────────────────────────────────

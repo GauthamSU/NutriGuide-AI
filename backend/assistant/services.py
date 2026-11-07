@@ -172,6 +172,7 @@ def get_conversation(owner_id: str, conversation_id: str) -> dict:
             "transcription": message.transcription,
             "input_modalities": message.input_modalities,
             "result": {
+                "message_id": str(message.id),
                 "dish_name": ai_resp.get("dish_name", ""),
                 "description": ai_resp.get("recognized_input_summary", ""),
                 "ai_dish_name": ai_resp.get("original_dish_name") or ai_resp.get("dish_name", ""),
@@ -247,6 +248,8 @@ def delete_conversation(owner_id: str, conversation_id: str) -> dict:
     tm_filter = Q(conversation_id=str(conversation_uuid)) | Q(source_message_id__in=message_ids)
     if tracker_log_ids:
         tm_filter |= Q(id__in=tracker_log_ids)
+    if dish_titles:
+        tm_filter |= (Q(owner_id=str(owner_uuid)) & Q(meal_title__in=dish_titles))
     TrackedMeal.objects.filter(tm_filter).delete()
 
     # Cascade delete any matching GroupMealLog entries for this user and dish titles
@@ -325,7 +328,9 @@ def delete_chat_message(
     tm_filter = Q(source_message_id=msg_id_str)
     if tracker_log_id:
         tm_filter |= Q(id=tracker_log_id)
-    if conv_id_str and meal_title:
+    if meal_title:
+        tm_filter |= (Q(owner_id=str(owner_uuid)) & Q(meal_title__iexact=str(meal_title).strip()))
+    elif conv_id_str and meal_title:
         tm_filter |= (Q(conversation_id=conv_id_str) & Q(meal_title=str(meal_title).strip()))
     TrackedMeal.objects.filter(tm_filter).delete()
 

@@ -876,3 +876,18 @@ async def refresh_group_notifications() -> None:
                 badge.className = "ml-auto hidden items-center justify-center rounded-full bg-[#245c43] px-2 py-0.5 text-[10px] font-bold text-white"
     except Exception:
         pass
+
+
+async def handle_delete_group_meal(group_id: str, meal_id: str) -> None:
+    """Delete a meal from a group feed and refresh the view."""
+    if not group_id or not meal_id:
+        return
+    try:
+        ok, data = await _post_json(f"/groups/{group_id}/meals/{meal_id}/delete")
+        if not ok:
+            window.alert(error_detail(data, "Could not delete this meal from the group."))
+            return
+        await _reload_current_groups_view()
+    except Exception as exc:
+        window.alert(f"An error occurred: {exc}")
+

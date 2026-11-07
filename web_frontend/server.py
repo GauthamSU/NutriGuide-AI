@@ -256,6 +256,9 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 self._send_template(fragment, context)
             else:
                 self._send_template(template_name, context)
+        elif route_path in ("/chats/customize-recipe", "/chats/reset-recipe", "/tracker/log"):
+            self._send_redirect("/tracker" if route_path == "/tracker/log" else "/", status=303)
+            return
         elif route_path.startswith("/chats/"):
             owner_id = self._get_owner_id()
             conversation_id = route_path.removeprefix("/chats/")
@@ -576,9 +579,27 @@ class FrontendHandler(BaseHTTPRequestHandler):
                         json=fields,
                         headers=self._auth_headers(token),
                     )
-                self._send_json(response.json(), status=response.status_code)
-            except (httpx.HTTPError, ValueError):
-                logger.exception("Tracker log request failed")
+                response.raise_for_status()
+                data = response.json()
+
+                accept_hdr = self.headers.get("Accept", "").lower()
+                is_hx = self.headers.get("HX-Request", "").lower() == "true"
+                if not is_hx and "text/html" in accept_hdr:
+                    conv_id = str(fields.get("conversation_id") or "").strip()
+                    redirect_target = f"/chats/{conv_id}" if conv_id else "/tracker"
+                    self._send_redirect(redirect_target, status=303)
+                    return
+
+                self._send_json(data, status=response.status_code)
+            except Exception as exc:
+                logger.exception("Tracker log request failed: %s", exc)
+                accept_hdr = self.headers.get("Accept", "").lower()
+                is_hx = self.headers.get("HX-Request", "").lower() == "true"
+                if not is_hx and "text/html" in accept_hdr:
+                    conv_id = str(fields.get("conversation_id") or "").strip()
+                    redirect_target = f"/chats/{conv_id}" if conv_id else "/tracker"
+                    self._send_redirect(redirect_target, status=303)
+                    return
                 self._send_json({"detail": "Could not log meal to tracker."}, status=502)
             return
 
@@ -680,16 +701,43 @@ class FrontendHandler(BaseHTTPRequestHandler):
 
         # ─── Recipe Customization Proxy Routes ────────────────────────────────
         if route_path.endswith("/customize-recipe"):
-            inner = route_path.removeprefix("/chats/").removesuffix("/customize-recipe").strip("/")
-            parts = [p for p in inner.split("/") if p]
-            conv_id = parts[0] if len(parts) >= 3 and parts[1] == "messages" else (parts[0] if len(parts) == 2 and parts[0] != "messages" else "")
-            msg_id = parts[-1] if parts and parts[-1] != "messages" else ""
             owner_id = self._get_effective_owner_id()
+            token = self._get_auth_token()
             fields, _ = self._parse_form()
 
-            if not msg_id or msg_id == "messages":
+            conv_id = str(fields.get("conversation_id") or "").strip()
+            msg_id = str(fields.get("message_id") or "").strip()
+
+            standard_base = {
+                "/chats/customize-recipe",
+                "/chats/messages/customize-recipe",
+                "/chats/conversations/customize-recipe",
+                "/customize-recipe",
+            }
+            if route_path not in standard_base:
+                clean_path = route_path
+                for prefix in ("/chats/", "/chats", "/"):
+                    if clean_path.startswith(prefix):
+                        clean_path = clean_path[len(prefix):]
+                        break
+                for suffix in ("/customize-recipe", "customize-recipe"):
+                    if clean_path.endswith(suffix):
+                        clean_path = clean_path[:-len(suffix)]
+                        break
+                parts = [p.strip("/") for p in clean_path.split("/") if p.strip("/")]
+                meaningful_parts = [p for p in parts if p not in {"conversations", "messages", "customize-recipe"}]
+                if len(meaningful_parts) >= 2:
+                    conv_id = meaningful_parts[0]
+                    msg_id = meaningful_parts[1]
+                elif len(meaningful_parts) == 1:
+                    if not msg_id:
+                        msg_id = meaningful_parts[0]
+                    elif not conv_id:
+                        conv_id = meaningful_parts[0]
+
+            if msg_id in {"customize-recipe", "messages", "conversations"}:
                 msg_id = str(fields.get("message_id") or "").strip()
-            if not conv_id or conv_id == "messages":
+            if conv_id in {"customize-recipe", "messages", "conversations"}:
                 conv_id = str(fields.get("conversation_id") or "").strip()
 
             # Parse ingredients from JSON string or list
@@ -722,27 +770,35 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 ],
             }
 
+            if not msg_id:
+                self._send_json({"detail": "Message ID is required to customize recipe."}, status=400)
+                return
+
             try:
                 with httpx.Client(timeout=30.0) as client:
                     if conv_id and msg_id:
                         endpoint = f"{API_BASE_URL}/api/chat-history/conversations/{conv_id}/messages/{msg_id}/customize-recipe"
                     else:
                         endpoint = f"{API_BASE_URL}/api/chat-history/messages/{msg_id}/customize-recipe"
-                    response = client.post(endpoint, json=api_payload)
+                    response = client.post(
+                        endpoint,
+                        json=api_payload,
+                        headers=self._auth_headers(token),
+                    )
                 response.raise_for_status()
                 data = response.json()
 
-                is_html_req = (
-                    self.headers.get("HX-Request", "").lower() == "true"
-                    or "text/html" in self.headers.get("Accept", "").lower()
-                )
-                if is_html_req:
+                is_hx = self.headers.get("HX-Request", "").lower() == "true"
+                accept_hdr = self.headers.get("Accept", "").lower()
+
+                if is_hx:
                     analysis = data.get("analysis") or {}
                     analysis["total_micronutrients"] = self._aggregate_micronutrients(
                         analysis.get("items") or []
                     )
                     turn_context = {
                         "result": {
+                            "message_id": msg_id,
                             "dish_name": data.get("dish_name") or dish_name,
                             "description": data.get("description") or description,
                             "ai_dish_name": data.get("ai_dish_name"),
@@ -760,6 +816,12 @@ class FrontendHandler(BaseHTTPRequestHandler):
                     html = TEMPLATES.get_template("components/nutrition_results.html").render(**turn_context)
                     self._send_html(html)
                     return
+
+                if "text/html" in accept_hdr:
+                    redirect_target = f"/chats/{conv_id}" if (conv_id and conv_id not in {"customize-recipe", "reset-recipe"}) else "/"
+                    self._send_redirect(redirect_target, status=303)
+                    return
+
                 self._send_json(data, status=200)
             except Exception as exc:
                 logger.exception("Recipe customization failed: %s", exc)
@@ -767,37 +829,74 @@ class FrontendHandler(BaseHTTPRequestHandler):
             return
 
         if route_path.endswith("/reset-recipe"):
-            inner = route_path.removeprefix("/chats/").removesuffix("/reset-recipe").strip("/")
-            parts = [p for p in inner.split("/") if p]
-            conv_id = parts[0] if len(parts) >= 3 and parts[1] == "messages" else (parts[0] if len(parts) == 2 and parts[0] != "messages" else "")
-            msg_id = parts[-1] if parts and parts[-1] != "messages" else ""
             owner_id = self._get_effective_owner_id()
+            token = self._get_auth_token()
             fields, _ = self._parse_form()
-            if not msg_id or msg_id == "messages":
+
+            conv_id = str(fields.get("conversation_id") or "").strip()
+            msg_id = str(fields.get("message_id") or "").strip()
+
+            standard_base = {
+                "/chats/reset-recipe",
+                "/chats/messages/reset-recipe",
+                "/chats/conversations/reset-recipe",
+                "/reset-recipe",
+            }
+            if route_path not in standard_base:
+                clean_path = route_path
+                for prefix in ("/chats/", "/chats", "/"):
+                    if clean_path.startswith(prefix):
+                        clean_path = clean_path[len(prefix):]
+                        break
+                for suffix in ("/reset-recipe", "reset-recipe"):
+                    if clean_path.endswith(suffix):
+                        clean_path = clean_path[:-len(suffix)]
+                        break
+                parts = [p.strip("/") for p in clean_path.split("/") if p.strip("/")]
+                meaningful_parts = [p for p in parts if p not in {"conversations", "messages", "reset-recipe"}]
+                if len(meaningful_parts) >= 2:
+                    conv_id = meaningful_parts[0]
+                    msg_id = meaningful_parts[1]
+                elif len(meaningful_parts) == 1:
+                    if not msg_id:
+                        msg_id = meaningful_parts[0]
+                    elif not conv_id:
+                        conv_id = meaningful_parts[0]
+
+            if msg_id in {"reset-recipe", "messages", "conversations"}:
                 msg_id = str(fields.get("message_id") or "").strip()
-            if not conv_id or conv_id == "messages":
+            if conv_id in {"reset-recipe", "messages", "conversations"}:
                 conv_id = str(fields.get("conversation_id") or "").strip()
+
+            if not msg_id:
+                self._send_json({"detail": "Message ID is required to reset recipe."}, status=400)
+                return
+
             try:
                 with httpx.Client(timeout=30.0) as client:
                     if conv_id and msg_id:
                         endpoint = f"{API_BASE_URL}/api/chat-history/conversations/{conv_id}/messages/{msg_id}/reset-recipe"
                     else:
                         endpoint = f"{API_BASE_URL}/api/chat-history/messages/{msg_id}/reset-recipe"
-                    response = client.post(endpoint, params={"owner_id": owner_id})
+                    response = client.post(
+                        endpoint,
+                        params={"owner_id": owner_id},
+                        headers=self._auth_headers(token),
+                    )
                 response.raise_for_status()
                 data = response.json()
 
-                is_html_req = (
-                    self.headers.get("HX-Request", "").lower() == "true"
-                    or "text/html" in self.headers.get("Accept", "").lower()
-                )
-                if is_html_req:
+                is_hx = self.headers.get("HX-Request", "").lower() == "true"
+                accept_hdr = self.headers.get("Accept", "").lower()
+
+                if is_hx:
                     analysis = data.get("analysis") or {}
                     analysis["total_micronutrients"] = self._aggregate_micronutrients(
                         analysis.get("items") or []
                     )
                     turn_context = {
                         "result": {
+                            "message_id": msg_id,
                             "dish_name": data.get("dish_name"),
                             "description": data.get("description"),
                             "ai_dish_name": data.get("ai_dish_name"),
@@ -815,6 +914,12 @@ class FrontendHandler(BaseHTTPRequestHandler):
                     html = TEMPLATES.get_template("components/nutrition_results.html").render(**turn_context)
                     self._send_html(html)
                     return
+
+                if "text/html" in accept_hdr:
+                    redirect_target = f"/chats/{conv_id}" if (conv_id and conv_id not in {"customize-recipe", "reset-recipe"}) else "/"
+                    self._send_redirect(redirect_target, status=303)
+                    return
+
                 self._send_json(data, status=200)
             except Exception as exc:
                 logger.exception("Recipe reset failed: %s", exc)
@@ -986,6 +1091,31 @@ class FrontendHandler(BaseHTTPRequestHandler):
             except (httpx.HTTPError, ValueError):
                 logger.exception("Group meal log failed")
                 self._send_json({"detail": "Could not log meal to group."}, status=502)
+            return
+
+        if route_path == "/groups/meals/delete" or (
+            route_path.startswith("/groups/") and "/meals/" in route_path and route_path.endswith("/delete")
+        ):
+            fields, _ = self._parse_form()
+            if route_path == "/groups/meals/delete":
+                group_id = str(fields.get("group_id") or "").strip()
+                meal_id = str(fields.get("meal_id") or "").strip()
+            else:
+                parts = route_path.removeprefix("/groups/").removesuffix("/delete").strip("/").split("/meals/")
+                group_id, meal_id = (parts[0], parts[1]) if len(parts) == 2 else ("", "")
+            owner_id = self._get_effective_owner_id()
+            token = self._get_auth_token()
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    response = client.post(
+                        f"{API_BASE_URL}/api/groups/{group_id}/meals/{meal_id}/delete",
+                        params={"owner_id": owner_id},
+                        headers=self._auth_headers(token),
+                    )
+                self._send_json(response.json(), status=response.status_code)
+            except (httpx.HTTPError, ValueError):
+                logger.exception("Group meal deletion failed meal_id=%s", meal_id)
+                self._send_json({"detail": "Could not delete group meal."}, status=502)
             return
 
         if route_path == "/groups/requests/respond" or (

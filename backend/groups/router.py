@@ -10,6 +10,7 @@ from backend.common.schemas import (
 from backend.groups.services import (
     add_member_to_group,
     create_nutrition_group,
+    delete_group_meal,
     get_group_detail,
     join_public_group,
     list_groups_for_user,
@@ -137,3 +138,17 @@ def api_log_group_meal(request, group_id: str, payload: GroupMealLogRequestSchem
         serving_grams=payload.serving_grams,
         serving_notes=notes_val,
     )
+
+
+@groups_router.delete("/{group_id}/meals/{meal_id}", summary="Delete a meal from a group feed")
+@groups_router.post("/{group_id}/meals/{meal_id}/delete", summary="Delete a meal from a group feed (POST alternative)")
+def api_delete_group_meal(
+    request,
+    group_id: str,
+    meal_id: str,
+    token: Optional[str] = None,
+    owner_id: Optional[str] = None,
+):
+    user = get_user_from_request(request, token=token, owner_id=owner_id, require_auth=True)
+    return delete_group_meal(user, group_id=group_id, meal_id=meal_id)
+

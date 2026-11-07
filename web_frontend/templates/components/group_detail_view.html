@@ -375,9 +375,24 @@
                   </div>
                 </div>
 
-                <span class="text-xs text-[#6d7871] font-medium flex-none">
-                  {{ meal.created_at[:16]|replace('T', ' ') }}
-                </span>
+                <div class="flex items-center gap-2 flex-none">
+                  <span class="text-xs text-[#6d7871] font-medium">
+                    {{ meal.created_at[:16]|replace('T', ' ') }}
+                  </span>
+                  {% if current_user and (meal.username == current_user.username or (meal.user and meal.user.username == current_user.username) or group.is_admin) %}
+                    <button
+                      type="button"
+                      class="delete-group-meal-btn h-7 w-7 rounded-lg flex items-center justify-center text-stone-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition cursor-pointer"
+                      data-delete-group-meal-id="{{ meal.id }}"
+                      data-delete-group-id="{{ group.id }}"
+                      data-meal-title="{{ meal.meal_title }}"
+                      title="Delete this meal from group feed"
+                      aria-label="Delete this meal from group feed"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                  {% endif %}
+                </div>
               </div>
 
               <!-- Meal Title -->

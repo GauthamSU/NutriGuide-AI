@@ -527,13 +527,17 @@ async def handle_submit_chat_log(form) -> None:
             return
 
         # Success: update chat turn button to logged state
-        if active_chat_log_button:
-            active_chat_log_button.disabled = True
-            active_chat_log_button.className = "turn-action-btn turn-action-logged inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-300 opacity-90 cursor-default"
-            active_chat_log_button.innerHTML = (
+        btn = active_chat_log_button or (window.document.getElementById(f"turn-log-btn-{msg_id}") if msg_id else None)
+        if btn:
+            btn.disabled = True
+            btn.classList.add("turn-action-logged", "is-logged")
+            btn.classList.remove("turn-action-log")
+            btn.className = "turn-action-btn turn-action-logged inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 opacity-90 cursor-default"
+            btn.innerHTML = (
                 '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>'
                 '<span>Logged to Tracker ✓</span>'
             )
+        active_chat_log_button = None
 
         close_modal("log-to-tracker-modal")
         if submit_btn:
